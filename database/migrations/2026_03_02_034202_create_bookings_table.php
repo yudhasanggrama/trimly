@@ -12,12 +12,12 @@ return new class extends Migration {
             $table->foreignId('customer_id')
                 ->constrained()
                 ->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
 
             $table->date('booking_date');
             $table->time('booking_time');
-            $table->enum('status', ['active', 'on-progress', 'cancelled', 'completed'])->default('active')
+            $table->enum('status', ['active', 'on-progress', 'cancelled', 'completed'])
                 ->default('active');
-
             $table->timestamps();
 
             $table->unique(['booking_date', 'booking_time']);
