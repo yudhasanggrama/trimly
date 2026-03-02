@@ -4,8 +4,12 @@
 <div class="max-w-6xl mx-auto py-6 px-4"
      x-data="{
         filterStatus: 'all',
-        filterDate: '',
+        filterDate: '{{ $today }}',
         filterSearch: '',
+
+        init() {
+            this.$nextTick(() => this.applyFilter());
+        },
 
         applyFilter() {
             document.querySelectorAll('[data-row]').forEach(row => {
@@ -49,17 +53,33 @@
      x-init="setInterval(() => refreshTable(), 5000)">
 
     {{-- Header --}}
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
         <div>
             <h2 class="text-2xl sm:text-3xl font-black italic tracking-tighter text-slate-900 uppercase">Dashboard<span class="text-amber-500">.</span></h2>
             <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Manajemen Antrean TRIMLY</p>
         </div>
-        <div class="flex items-center gap-2 bg-black text-white px-3 py-2 rounded-full">
-            <span class="flex h-2 w-2 relative">
-                <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span class="text-[10px] font-black uppercase tracking-widest">Live</span>
+        <div class="flex flex-wrap items-center gap-3">
+
+            {{-- Kapasitas Setting --}}
+            <form action="{{ route('admin.settings') }}" method="POST" class="flex items-center gap-2 bg-white border-2 border-slate-100 rounded-2xl px-4 py-2 shadow-sm">
+                @csrf
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest italic whitespace-nowrap">Kapasitas/Jam</span>
+                <input type="number" name="capacity" min="1" max="20"
+                    value="{{ $capacity }}"
+                    class="w-14 text-center bg-slate-50 border-2 border-transparent focus:border-black rounded-xl py-1.5 font-black text-base outline-none transition-all">
+                <button class="bg-black text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase hover:bg-amber-500 transition whitespace-nowrap">
+                    Simpan
+                </button>
+            </form>
+
+            {{-- Live Indicator --}}
+            <div class="flex items-center gap-2 bg-black text-white px-3 py-2 rounded-full">
+                <span class="flex h-2 w-2 relative">
+                    <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span class="text-[10px] font-black uppercase tracking-widest">Live</span>
+            </div>
         </div>
     </div>
 
@@ -87,7 +107,10 @@
                 </div>
             </div>
             <div>
-                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">Tanggal</label>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">
+                    Tanggal
+                    <span class="ml-2 text-amber-500 normal-case font-bold">(default: hari ini)</span>
+                </label>
                 <input type="date" x-model="filterDate" @change="applyFilter()"
                     class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-black rounded-2xl text-sm font-bold outline-none transition-all">
             </div>
@@ -107,9 +130,6 @@
             <button @click="filterStatus = 'completed'; applyFilter()"
                 :class="filterStatus === 'completed' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-500'"
                 class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● Completed</button>
-            <button @click="filterStatus = 'cancelled'; applyFilter()"
-                :class="filterStatus === 'cancelled' ? 'bg-red-500 text-white' : 'bg-red-50 text-red-500'"
-                class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● Cancelled</button>
         </div>
 
         {{-- Count + Reset --}}
@@ -121,7 +141,7 @@
             </div>
             <button @click="resetFilter()"
                 class="px-4 py-2 bg-slate-100 hover:bg-red-50 hover:text-red-500 rounded-xl text-[10px] font-black uppercase transition-all">
-                ✕ Reset
+                ✕ Reset (Semua Data)
             </button>
         </div>
     </div>
@@ -144,8 +164,7 @@
                 <span class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase ml-2 shrink-0
                     {{ $b->status == 'active' ? 'bg-green-100 text-green-700' : '' }}
                     {{ $b->status == 'on-progress' ? 'bg-blue-600 text-white animate-pulse' : '' }}
-                    {{ $b->status == 'completed' ? 'bg-slate-100 text-slate-600' : '' }}
-                    {{ $b->status == 'cancelled' ? 'bg-red-100 text-red-600' : '' }}">
+                    {{ $b->status == 'completed' ? 'bg-slate-100 text-slate-600' : '' }}">
                     {{ $b->status }}
                 </span>
             </div>
@@ -226,8 +245,7 @@
                             <span class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase
                                 {{ $b->status == 'active' ? 'bg-green-100 text-green-700' : '' }}
                                 {{ $b->status == 'on-progress' ? 'bg-blue-600 text-white animate-pulse' : '' }}
-                                {{ $b->status == 'completed' ? 'bg-slate-100 text-slate-600' : '' }}
-                                {{ $b->status == 'cancelled' ? 'bg-red-100 text-red-600' : '' }}">
+                                {{ $b->status == 'completed' ? 'bg-slate-100 text-slate-600' : '' }}">
                                 {{ $b->status }}
                             </span>
                             @if($b->status == 'completed')

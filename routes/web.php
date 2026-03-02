@@ -3,7 +3,6 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Mail;
 
 // Guest & User Routes
 Route::get('/', [BookingController::class, 'index'])->name('home');
@@ -21,14 +20,5 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/admin/start/{id}', [BookingController::class, 'start'])->name('admin.start');
     Route::post('/admin/cancel/{id}', [BookingController::class, 'cancel'])->name('admin.cancel');
     Route::post('/admin/complete/{id}', [BookingController::class, 'complete'])->name('admin.complete');
-});
-
-
-Route::get('/test-mail', function () {
-    Mail::raw('Test email dari TRIMLY', function ($message) {
-        $message->to('raditbrian04@gmail.com')
-                ->subject('Test Email');
-    });
-
-    return 'Cek email sekarang!';
+    Route::post('/admin/settings', [BookingController::class, 'updateSettings'])->name('admin.settings');
 });
