@@ -7,7 +7,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Bus\Queueable;
 
-class BookingSuccessMail extends Mailable implements ShouldQueue
+class BookingCancelledMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -20,7 +20,7 @@ class BookingSuccessMail extends Mailable implements ShouldQueue
 
     public function build()
     {
-        return $this->subject('Booking Berhasil - TRIMLY')
-            ->view('emails.booking-success');
+        return $this->subject('Booking Dibatalkan - TRIMLY')
+            ->view('emails.booking-cancelled');
     }
 }

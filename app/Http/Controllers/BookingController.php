@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\BookingCancelledMail;
 use App\Models\Booking;
 use App\Models\Customer;
 use App\Models\Setting;
@@ -98,7 +99,7 @@ class BookingController extends Controller
 
             try {
                 Mail::to($customer->email)
-                    ->send(new BookingSuccessMail($booking));
+                    ->queue(new BookingSuccessMail($booking));
             } catch (\Exception $mailError) {
                 Log::error('Mail error: ' . $mailError->getMessage());
             }
@@ -156,7 +157,14 @@ class BookingController extends Controller
 
     public function cancel($id)
     {
-        Booking::findOrFail($id)->delete();
+        $booking = Booking::with('customer')->findOrFail($id);
+
+        // Kirim email sebelum delete
+        Mail::to($booking->customer->email)
+            ->queue(new BookingCancelledMail($booking));
+
+        $booking->delete();
+
         return back()->with('success', 'Booking dibatalkan dan slot kembali tersedia.');
     }
 
