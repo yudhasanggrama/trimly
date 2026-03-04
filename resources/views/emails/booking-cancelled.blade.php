@@ -14,7 +14,7 @@
 
         <!-- Body -->
         <div style="padding:30px;">
-            <p style="color:#333;">Halo <strong>{{ $booking->customer->name }}</strong>,</p>
+            <p style="color:#333;">Halo <strong>{{ $customerName }}</strong>,</p>
             
             <p style="color:#555;">
                 Mohon maaf, booking kamu telah <strong style="color:#dc2626;">dibatalkan oleh admin</strong>.
@@ -25,13 +25,13 @@
                     <tr>
                         <td style="color:#888; font-size:12px; padding:6px 0;">TANGGAL</td>
                         <td style="font-weight:bold; text-align:right;">
-                            {{ \Carbon\Carbon::parse($booking->booking_date)->isoFormat('dddd, D MMMM YYYY') }}
+                            {{ \Carbon\Carbon::parse($bookingDate)->isoFormat('dddd, D MMMM YYYY') }}
                         </td>
                     </tr>
                     <tr>
                         <td style="color:#888; font-size:12px; padding:6px 0;">JAM</td>
                         <td style="font-weight:bold; text-align:right; font-size:20px; color:#dc2626;">
-                            {{ substr($booking->booking_time, 0, 5) }} WIB
+                            {{ substr($bookingTime, 0, 5) }} WIB
                         </td>
                     </tr>
                     <tr>

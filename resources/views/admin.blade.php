@@ -7,8 +7,37 @@
         filterDate: '{{ $today }}',
         filterSearch: '',
 
+        rescheduleOpen: false,
+        rescheduleId: null,
+        rescheduleCustomer: '',
+        rescheduleDate: '',
+        today: '{{ $today }}',
+        availableSlots: [],
+        loadingSlots: false,
+
         init() {
             this.$nextTick(() => this.applyFilter());
+        },
+
+        async openReschedule(id, name, date) {
+            this.rescheduleId = id;
+            this.rescheduleCustomer = name;
+            this.rescheduleDate = date;
+            this.rescheduleOpen = true;
+            await this.loadSlots(date);
+        },
+
+        async loadSlots(date) {
+            if (!date) return;
+            this.loadingSlots = true;
+            this.availableSlots = [];
+            try {
+                const res = await fetch(`/admin/available-slots?date=${date}&exclude_id=${this.rescheduleId}`);
+                this.availableSlots = await res.json();
+            } catch(e) {
+                console.error('Gagal load slots:', e);
+            }
+            this.loadingSlots = false;
         },
 
         applyFilter() {
@@ -48,9 +77,109 @@
             if (newCards) document.getElementById('booking-cards-content').innerHTML = newCards.innerHTML;
 
             this.$nextTick(() => this.applyFilter());
+        },
+
+        submitReschedule() {
+            const form = document.getElementById('reschedule-form');
+            form.action = '/admin/reschedule/' + this.rescheduleId;
+            form.submit();
         }
      }"
      x-init="setInterval(() => refreshTable(), 5000)">
+
+    {{-- Reschedule Modal --}}
+    <div x-show="rescheduleOpen"
+         x-cloak
+         class="fixed inset-0 z-[999] flex items-center justify-center p-4"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+
+        <div @click="rescheduleOpen = false" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative shadow-2xl z-10"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="scale-90 opacity-0"
+             x-transition:enter-end="scale-100 opacity-100">
+
+            <h3 class="text-2xl font-black italic tracking-tighter text-slate-900 uppercase mb-1">
+                Reschedule<span class="text-amber-500">.</span>
+            </h3>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6"
+               x-text="'Pelanggan: ' + rescheduleCustomer"></p>
+
+            <form id="reschedule-form" action="" method="POST">
+                @csrf
+                <input type="hidden" name="_method" value="PUT">
+
+                <div class="space-y-4">
+                    {{-- Tanggal --}}
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">Tanggal Baru</label>
+                        <input type="date" name="booking_date"
+                            :min="today"
+                            x-model="rescheduleDate"
+                            @change="loadSlots($event.target.value)"
+                            required
+                            class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-black rounded-2xl text-sm font-bold outline-none transition-all">
+                    </div>
+
+                    {{-- Jam --}}
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">
+                            Jam Baru
+                            <span x-show="loadingSlots" class="ml-1 text-amber-500 normal-case font-bold">Loading...</span>
+                        </label>
+
+                        {{-- Loading state --}}
+                        <div x-show="loadingSlots" class="w-full px-4 py-3 bg-slate-50 rounded-2xl text-sm text-slate-400 font-bold animate-pulse">
+                            Mengecek slot tersedia...
+                        </div>
+
+                        {{-- Slot tersedia --}}
+                        <div x-show="!loadingSlots && availableSlots.length > 0">
+                            <div class="relative">
+                                <select name="booking_time" required
+                                    class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-black rounded-2xl text-sm font-bold outline-none appearance-none transition-all cursor-pointer">
+                                    <template x-for="slot in availableSlots" :key="slot">
+                                        <option :value="slot" x-text="slot"></option>
+                                    </template>
+                                </select>
+                                <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Tidak ada slot --}}
+                        <div x-show="!loadingSlots && availableSlots.length === 0 && rescheduleDate !== ''"
+                            class="w-full px-4 py-3 bg-red-50 border-2 border-red-100 rounded-2xl text-xs font-black text-red-500 uppercase">
+                            ✕ Tidak ada slot tersedia di tanggal ini
+                        </div>
+
+                        {{-- Belum pilih tanggal --}}
+                        <div x-show="!loadingSlots && rescheduleDate === ''"
+                            class="w-full px-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold text-slate-400">
+                            Pilih tanggal terlebih dahulu
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 space-y-2">
+                    <button type="button" @click="submitReschedule()"
+                        :disabled="availableSlots.length === 0 || loadingSlots"
+                        :class="availableSlots.length === 0 || loadingSlots ? 'opacity-40 cursor-not-allowed' : 'hover:bg-amber-400 active:scale-95'"
+                        class="w-full bg-amber-500 text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition shadow-lg">
+                        ✦ Konfirmasi Reschedule
+                    </button>
+                    <button type="button" @click="rescheduleOpen = false"
+                        class="w-full py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition">
+                        Batal
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     {{-- Header --}}
     <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
@@ -59,20 +188,14 @@
             <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Manajemen Antrean TRIMLY</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-
-            {{-- Kapasitas Setting --}}
             <form action="{{ route('admin.settings') }}" method="POST" class="flex items-center gap-2 bg-white border-2 border-slate-100 rounded-2xl px-4 py-2 shadow-sm">
                 @csrf
                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest italic whitespace-nowrap">Kapasitas/Jam</span>
                 <input type="number" name="capacity" min="1" max="20"
                     value="{{ $capacity }}"
                     class="w-14 text-center bg-slate-50 border-2 border-transparent focus:border-black rounded-xl py-1.5 font-black text-base outline-none transition-all">
-                <button class="bg-black text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase hover:bg-amber-500 transition whitespace-nowrap">
-                    Simpan
-                </button>
+                <button class="bg-black text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase hover:bg-amber-500 transition whitespace-nowrap">Simpan</button>
             </form>
-
-            {{-- Live Indicator --}}
             <div class="flex items-center gap-2 bg-black text-white px-3 py-2 rounded-full">
                 <span class="flex h-2 w-2 relative">
                     <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
@@ -90,10 +213,14 @@
         </div>
     @endif
 
+    @if($errors->any())
+        <div class="mb-4 bg-red-50 border-2 border-red-100 p-4 rounded-2xl">
+            <p class="text-red-600 text-xs font-black uppercase italic">✕ {{ $errors->first() }}</p>
+        </div>
+    @endif
+
     {{-- Filter Bar --}}
     <div class="bg-white border-2 border-slate-100 rounded-3xl p-5 mb-6 shadow-sm">
-
-        {{-- Search + Date --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">Cari Nama</label>
@@ -108,41 +235,25 @@
             </div>
             <div>
                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">
-                    Tanggal
-                    <span class="ml-2 text-amber-500 normal-case font-bold">(default: hari ini)</span>
+                    Tanggal <span class="ml-2 text-amber-500 normal-case font-bold">(default: hari ini)</span>
                 </label>
                 <input type="date" x-model="filterDate" @change="applyFilter()"
                     class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-black rounded-2xl text-sm font-bold outline-none transition-all">
             </div>
         </div>
-
-        {{-- Status Pills --}}
         <div class="flex flex-wrap gap-2 mb-4">
-            <button @click="filterStatus = 'all'; applyFilter()"
-                :class="filterStatus === 'all' ? 'bg-black text-white' : 'bg-slate-100 text-slate-500'"
-                class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">Semua</button>
-            <button @click="filterStatus = 'active'; applyFilter()"
-                :class="filterStatus === 'active' ? 'bg-green-500 text-white' : 'bg-green-50 text-green-600'"
-                class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● Active</button>
-            <button @click="filterStatus = 'on-progress'; applyFilter()"
-                :class="filterStatus === 'on-progress' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'"
-                class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● On-Progress</button>
-            <button @click="filterStatus = 'completed'; applyFilter()"
-                :class="filterStatus === 'completed' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-500'"
-                class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● Completed</button>
+            <button @click="filterStatus = 'all'; applyFilter()" :class="filterStatus === 'all' ? 'bg-black text-white' : 'bg-slate-100 text-slate-500'" class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">Semua</button>
+            <button @click="filterStatus = 'active'; applyFilter()" :class="filterStatus === 'active' ? 'bg-green-500 text-white' : 'bg-green-50 text-green-600'" class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● Active</button>
+            <button @click="filterStatus = 'on-progress'; applyFilter()" :class="filterStatus === 'on-progress' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'" class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● On-Progress</button>
+            <button @click="filterStatus = 'completed'; applyFilter()" :class="filterStatus === 'completed' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-500'" class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● Completed</button>
         </div>
-
-        {{-- Count + Reset --}}
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-black text-slate-400 uppercase italic">Menampilkan</span>
                 <span class="bg-black text-amber-400 font-black text-sm px-3 py-1 rounded-full" id="result-count">{{ count($bookings) }}</span>
                 <span class="text-[10px] font-black text-slate-400 uppercase italic">data</span>
             </div>
-            <button @click="resetFilter()"
-                class="px-4 py-2 bg-slate-100 hover:bg-red-50 hover:text-red-500 rounded-xl text-[10px] font-black uppercase transition-all">
-                ✕ Reset (Semua Data)
-            </button>
+            <button @click="resetFilter()" class="px-4 py-2 bg-slate-100 hover:bg-red-50 hover:text-red-500 rounded-xl text-[10px] font-black uppercase transition-all">✕ Reset (Semua Data)</button>
         </div>
     </div>
 
@@ -155,7 +266,6 @@
              data-date="{{ $b->booking_date }}"
              data-name="{{ $b->customer->name }}">
 
-            {{-- Name + Status --}}
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <div class="font-black text-slate-900 uppercase italic">{{ $b->customer->name }}</div>
@@ -169,13 +279,10 @@
                 </span>
             </div>
 
-            {{-- Schedule --}}
             <div class="flex items-center gap-4 bg-slate-50 rounded-2xl px-4 py-3 mb-4">
                 <div>
                     <div class="text-[10px] font-black text-slate-400 uppercase italic mb-0.5">Tanggal</div>
-                    <div class="text-sm font-black text-slate-700 uppercase">
-                        {{ \Carbon\Carbon::parse($b->booking_date)->isoFormat('ddd, D MMM YYYY') }}
-                    </div>
+                    <div class="text-sm font-black text-slate-700 uppercase">{{ \Carbon\Carbon::parse($b->booking_date)->isoFormat('ddd, D MMM YYYY') }}</div>
                 </div>
                 <div class="w-px h-8 bg-slate-200 shrink-0"></div>
                 <div>
@@ -190,9 +297,8 @@
                 @endif
             </div>
 
-            {{-- Action Buttons --}}
             @if($b->status == 'active')
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid grid-cols-2 gap-2 mb-2">
                     <form action="{{ route('admin.start', $b->id) }}" method="POST">@csrf
                         <button class="w-full bg-blue-600 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-blue-700 transition">▶ Mulai</button>
                     </form>
@@ -200,6 +306,11 @@
                         <button class="w-full bg-red-500 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-red-600 transition">✕ Batal</button>
                     </form>
                 </div>
+                <button
+                    @click="openReschedule({{ $b->id }}, '{{ addslashes($b->customer->name) }}', '{{ $b->booking_date }}')"
+                    class="w-full bg-amber-50 border-2 border-amber-200 text-amber-600 py-3 rounded-2xl text-xs font-black uppercase hover:bg-amber-100 transition">
+                    ↺ Reschedule
+                </button>
             @elseif($b->status == 'on-progress')
                 <form action="{{ route('admin.complete', $b->id) }}" method="POST">@csrf
                     <button class="w-full bg-green-600 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-green-700 transition">✓ Selesai</button>
@@ -257,6 +368,11 @@
                                 <form action="{{ route('admin.start', $b->id) }}" method="POST" class="inline">@csrf
                                     <button class="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition mr-1">▶ Start</button>
                                 </form>
+                                <button
+                                    @click="openReschedule({{ $b->id }}, '{{ addslashes($b->customer->name) }}', '{{ $b->booking_date }}')"
+                                    class="bg-amber-400 text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-amber-300 transition mr-1">
+                                    ↺ Reschedule
+                                </button>
                                 <form action="{{ route('admin.cancel', $b->id) }}" method="POST" class="inline">@csrf
                                     <button class="bg-red-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-600 transition">✕ Cancel</button>
                                 </form>

@@ -2,20 +2,23 @@
 
 namespace App\Mail;
 
+use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Bus\Queueable;
 
-class BookingCancelledMail extends Mailable implements ShouldQueue
+class BookingCancelledMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $booking;
+    public $customerName;
+    public $bookingDate;
+    public $bookingTime;
 
-    public function __construct($booking)
+    public function __construct(string $customerName, string $bookingDate, string $bookingTime)
     {
-        $this->booking = $booking;
+        $this->customerName = $customerName;
+        $this->bookingDate  = $bookingDate;
+        $this->bookingTime  = $bookingTime;
     }
 
     public function build()
