@@ -2,90 +2,8 @@
 
 @section('content')
 <div class="max-w-6xl mx-auto py-6 px-4"
-     x-data="{
-        filterStatus: 'all',
-        filterDate: '{{ $today }}',
-        filterSearch: '',
-
-        rescheduleOpen: false,
-        rescheduleId: null,
-        rescheduleCustomer: '',
-        rescheduleDate: '',
-        today: '{{ $today }}',
-        availableSlots: [],
-        loadingSlots: false,
-
-        init() {
-            this.$nextTick(() => this.applyFilter());
-        },
-
-        async openReschedule(id, name, date) {
-            this.rescheduleId = id;
-            this.rescheduleCustomer = name;
-            this.rescheduleDate = date;
-            this.rescheduleOpen = true;
-            await this.loadSlots(date);
-        },
-
-        async loadSlots(date) {
-            if (!date) return;
-            this.loadingSlots = true;
-            this.availableSlots = [];
-            try {
-                const res = await fetch(`/admin/available-slots?date=${date}&exclude_id=${this.rescheduleId}`);
-                this.availableSlots = await res.json();
-            } catch(e) {
-                console.error('Gagal load slots:', e);
-            }
-            this.loadingSlots = false;
-        },
-
-        applyFilter() {
-            document.querySelectorAll('[data-row]').forEach(row => {
-                const status = row.dataset.status;
-                const date = row.dataset.date;
-                const name = row.dataset.name;
-
-                const matchStatus = this.filterStatus === 'all' || status === this.filterStatus;
-                const matchDate = this.filterDate === '' || date === this.filterDate;
-                const matchSearch = this.filterSearch === '' || name.toLowerCase().includes(this.filterSearch.toLowerCase());
-
-                row.style.display = (matchStatus && matchDate && matchSearch) ? '' : 'none';
-            });
-
-            const visible = document.querySelectorAll('[data-row]:not([style*=\'display: none\'])').length;
-            document.getElementById('result-count').textContent = visible;
-        },
-
-        resetFilter() {
-            this.filterStatus = 'all';
-            this.filterDate = '';
-            this.filterSearch = '';
-            this.$nextTick(() => this.applyFilter());
-        },
-
-        async refreshTable() {
-            let response = await fetch(window.location.href);
-            let text = await response.text();
-            let parser = new DOMParser();
-            let htmlDocument = parser.parseFromString(text, 'text/html');
-
-            let newTable = htmlDocument.getElementById('booking-table-content');
-            if (newTable) document.getElementById('booking-table-content').innerHTML = newTable.innerHTML;
-
-            let newCards = htmlDocument.getElementById('booking-cards-content');
-            if (newCards) document.getElementById('booking-cards-content').innerHTML = newCards.innerHTML;
-
-            this.$nextTick(() => this.applyFilter());
-        },
-
-        submitReschedule() {
-            const form = document.getElementById('reschedule-form');
-            form.action = '/admin/reschedule/' + this.rescheduleId;
-            form.submit();
-        }
-     }"
-     x-init="setInterval(() => refreshTable(), 5000)">
+     x-data="adminDashboard()"
+     x-init="init()">
 
     {{-- Reschedule Modal --}}
     <div x-show="rescheduleOpen"
@@ -247,6 +165,19 @@
             <button @click="filterStatus = 'on-progress'; applyFilter()" :class="filterStatus === 'on-progress' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'" class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● On-Progress</button>
             <button @click="filterStatus = 'completed'; applyFilter()" :class="filterStatus === 'completed' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-500'" class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">● Completed</button>
         </div>
+        <div class="flex flex-wrap gap-2 mb-4">
+            <button @click="sortOrder = 'newest'; applyFilter()"
+                :class="sortOrder === 'newest' ? 'bg-black text-white' : 'bg-slate-100 text-slate-500'"
+                class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">
+                ⬇ Newest
+            </button>
+
+            <button @click="sortOrder = 'oldest'; applyFilter()"
+                :class="sortOrder === 'oldest' ? 'bg-black text-white' : 'bg-slate-100 text-slate-500'"
+                class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">
+                ⬆ Oldest
+            </button>
+        </div>
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-black text-slate-400 uppercase italic">Menampilkan</span>
@@ -264,6 +195,7 @@
              data-row
              data-status="{{ $b->status }}"
              data-date="{{ $b->booking_date }}"
+             data-time="{{ $b->booking_time }}"
              data-name="{{ $b->customer->name }}">
 
             <div class="flex justify-between items-start mb-4">
@@ -401,4 +333,149 @@
     </div>
 
 </div>
+
+<script>
+    function adminDashboard() {
+        return {
+
+            filterStatus: 'all',
+            filterDate: '{{ $today }}',
+            filterSearch: '',
+            sortOrder: 'newest',
+
+            rescheduleOpen: false,
+            rescheduleId: null,
+            rescheduleCustomer: '',
+            rescheduleDate: '',
+            today: '{{ $today }}',
+            availableSlots: [],
+            loadingSlots: false,
+            loadingRefresh: false,
+
+            init() {
+                this.$nextTick(() => this.applyFilter());
+
+                setInterval(() => {
+                    if (document.visibilityState === 'visible') {
+                        this.refreshTable();
+                    }
+                }, 2000);
+            },
+
+            async refreshTable() {
+                if (this.loadingRefresh) return;
+                this.loadingRefresh = true;
+
+                try {
+                    let response = await fetch(window.location.href);
+                    let text = await response.text();
+                    let parser = new DOMParser();
+                    let htmlDocument = parser.parseFromString(text, 'text/html');
+
+                    let newTable = htmlDocument.getElementById('booking-table-content');
+                    if (newTable) {
+                        document.getElementById('booking-table-content').innerHTML = newTable.innerHTML;
+                    }
+
+                    let newCards = htmlDocument.getElementById('booking-cards-content');
+                    if (newCards) {
+                        document.getElementById('booking-cards-content').innerHTML = newCards.innerHTML;
+                    }
+
+                    this.$nextTick(() => this.applyFilter());
+
+                } catch (e) {
+                    console.error('Refresh gagal:', e);
+                }
+
+                this.loadingRefresh = false;
+            },
+
+            applyFilter() {
+
+                let rows = Array.from(document.querySelectorAll('[data-row]'));
+
+                rows.forEach(row => {
+
+                    const status = row.dataset.status;
+                    const date   = row.dataset.date;
+                    const name   = row.dataset.name;
+
+                    const matchStatus = this.filterStatus === 'all' || status === this.filterStatus;
+                    const matchDate   = this.filterDate === '' || date === this.filterDate;
+                    const matchSearch = this.filterSearch === '' || 
+                        name.includes(this.filterSearch.toLowerCase());
+
+                    row.style.display = (matchStatus && matchDate && matchSearch) ? '' : 'none';
+                });
+
+                let visibleRows = rows.filter(row => row.style.display !== 'none');
+
+                // 🔥 SORTING FIX (DATE + TIME)
+                visibleRows.sort((a, b) => {
+
+                    const dateTimeA = new Date(
+                        a.dataset.date + ' ' + a.dataset.time
+                    );
+
+                    const dateTimeB = new Date(
+                        b.dataset.date + ' ' + b.dataset.time
+                    );
+
+                    return this.sortOrder === 'newest'
+                        ? dateTimeB - dateTimeA
+                        : dateTimeA - dateTimeB;
+                });
+
+                visibleRows.forEach(row => {
+                    row.parentNode.appendChild(row);
+                });
+
+                const result = document.getElementById('result-count');
+                if (result) {
+                    result.textContent = visibleRows.length;
+                }
+            },
+
+            resetFilter() {
+                this.filterStatus = 'all';
+                this.filterDate   = '';
+                this.filterSearch = '';
+                this.sortOrder    = 'newest';
+
+                this.$nextTick(() => this.applyFilter());
+            },
+
+            async openReschedule(id, name, date) {
+                this.rescheduleId = id;
+                this.rescheduleCustomer = name;
+                this.rescheduleDate = date;
+                this.rescheduleOpen = true;
+                await this.loadSlots(date);
+            },
+
+            async loadSlots(date) {
+                if (!date) return;
+
+                this.loadingSlots = true;
+                this.availableSlots = [];
+
+                try {
+                    const res = await fetch(`/admin/available-slots?date=${date}&exclude_id=${this.rescheduleId}`);
+                    this.availableSlots = await res.json();
+                } catch (e) {
+                    console.error('Gagal load slots:', e);
+                }
+
+                this.loadingSlots = false;
+            },
+
+            submitReschedule() {
+                const form = document.getElementById('reschedule-form');
+                form.action = '/admin/reschedule/' + this.rescheduleId;
+                form.submit();
+            }
+        }
+    }
+</script>
 @endsection

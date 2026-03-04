@@ -4,14 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Mail\BookingCancelledMail;
 use App\Mail\BookingRescheduledMail;
+use App\Mail\BookingSuccessMail;
 use App\Models\Booking;
 use App\Models\Customer;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\BookingSuccessMail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class BookingController extends Controller
 {
@@ -23,7 +24,7 @@ class BookingController extends Controller
 
     public function index(Request $request)
     {
-        $date = $request->date ?? now()->toDateString();
+        $date     = $request->date ?? now()->toDateString();
         $capacity = (int) Setting::get('capacity', 1);
 
         $bookedSlots = Booking::where('booking_date', $date)
@@ -41,8 +42,12 @@ class BookingController extends Controller
                 ->find(session('booking_success_id'));
         }
 
-        return view('home', compact('date', 'bookedSlots', 'successBooking', 'capacity'))
-            ->with('timeSlots', $this->timeSlots);
+        return view('home', compact(
+            'date',
+            'bookedSlots',
+            'successBooking',
+            'capacity'
+        ))->with('timeSlots', $this->timeSlots);
     }
 
     public function store(Request $request)
@@ -68,41 +73,49 @@ class BookingController extends Controller
         }
 
         $request->validate([
-            'booking_date' => 'required|date',
+            'booking_date' => 'required|date|after_or_equal:today',
             'booking_time' => 'required',
         ]);
 
         $capacity = (int) Setting::get('capacity', 1);
 
-        $bookedCount = Booking::where('booking_date', $request->booking_date)
-            ->whereRaw("TIME_FORMAT(booking_time, '%H:%i') = ?", [$request->booking_time])
-            ->whereIn('status', ['active', 'on-progress'])
-            ->count();
-
-        if ($bookedCount >= $capacity) {
-            return back()->withErrors([
-                'msg' => 'Maaf, slot ini sudah penuh. Pilih jam lain!'
-            ]);
-        }
-
-        $existingBooking = Booking::where('booking_date', $request->booking_date)
-            ->whereRaw("TIME_FORMAT(booking_time, '%H:%i') = ?", [$request->booking_time])
-            ->whereHas('customer', function ($query) use ($email, $phone) {
-                $query->where('email', $email)
-                        ->orWhere('phone', $phone);
-            })
-            ->first();
-
-        if ($existingBooking) { 
-            return back()->withErrors([
-                'msg' => 'Kamu masih memiliki booking aktif pada ' . 
-                 \Carbon\Carbon::parse($existingBooking->booking_date)->isoFormat('D MMM YYYY') . 
-                 ' jam ' . substr($existingBooking->booking_time, 0, 5) . 
-                 '. Tunggu hingga selesai atau hubungi admin untuk membatalkan.'
-            ]);
-        }
-
         try {
+
+            DB::beginTransaction();
+
+            $bookedCount = Booking::where('booking_date', $request->booking_date)
+                ->where('booking_time', $request->booking_time . ':00')
+                ->whereIn('status', ['active', 'on-progress'])
+                ->lockForUpdate()
+                ->count();
+
+            if ($bookedCount >= $capacity) {
+                DB::rollBack();
+                return back()->withErrors([
+                    'msg' => 'Maaf, slot ini sudah penuh. Pilih jam lain!'
+                ]);
+            }
+
+            $existingBooking = Booking::where('booking_date', $request->booking_date)
+                ->where('booking_time', $request->booking_time . ':00')
+                ->whereIn('status', ['active', 'on-progress'])
+                ->whereHas('customer', function ($query) use ($email, $phone) {
+                    $query->where('email', $email)
+                          ->orWhere('phone', $phone);
+                })
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingBooking) {
+                DB::rollBack();
+                return back()->withErrors([
+                    'msg' => 'Kamu masih memiliki booking aktif pada ' .
+                        Carbon::parse($existingBooking->booking_date)->isoFormat('D MMM YYYY') .
+                        ' jam ' . substr($existingBooking->booking_time, 0, 5) .
+                        '. Tunggu hingga selesai atau hubungi admin.'
+                ]);
+            }
+
             $customer = Customer::firstOrCreate(
                 ['phone' => $phone],
                 ['name' => $name, 'email' => $email]
@@ -115,22 +128,25 @@ class BookingController extends Controller
                 'status'       => 'active',
             ]);
 
-                try {
-                        Mail::to($customer->email)
-                            ->queue(new BookingSuccessMail($booking));
-                    } catch (\Exception $mailError) {
-                        Log::error('Mail error: ' . $mailError->getMessage());
-                }
+            DB::commit();
+
+            try {
+                Mail::to($customer->email)
+                    ->queue(new BookingSuccessMail($booking));
+            } catch (\Exception $mailError) {
+                Log::error('Mail error: ' . $mailError->getMessage());
+            }
 
             return redirect()
                 ->route('home')
                 ->with('booking_success_id', $booking->id);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Booking error: ' . $e->getMessage());
 
             return back()->withErrors([
-                'msg' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+                'msg' => 'Terjadi kesalahan sistem.'
             ]);
         }
     }
@@ -145,13 +161,17 @@ class BookingController extends Controller
         $booking  = Booking::with('customer')->findOrFail($id);
         $capacity = (int) Setting::get('capacity', 1);
 
+        DB::beginTransaction();
+
         $bookedCount = Booking::where('booking_date', $request->booking_date)
-            ->whereRaw("TIME_FORMAT(booking_time, '%H:%i') = ?", [$request->booking_time])
+            ->where('booking_time', $request->booking_time . ':00')
             ->whereIn('status', ['active', 'on-progress'])
             ->where('id', '!=', $id)
+            ->lockForUpdate()
             ->count();
 
         if ($bookedCount >= $capacity) {
+            DB::rollBack();
             return back()->withErrors([
                 'msg' => 'Slot baru sudah penuh! Pilih jam lain.'
             ]);
@@ -165,32 +185,32 @@ class BookingController extends Controller
             'booking_time' => $request->booking_time . ':00',
         ]);
 
+        DB::commit();
+
         try {
             Mail::to($booking->customer->email)
                 ->queue(new BookingRescheduledMail($booking, $oldDate, $oldTime));
-        } catch (\Exception $mailError) {
-            Log::error('Reschedule mail error: ' . $mailError->getMessage());
+        } catch (\Exception $e) {
+            Log::error('Reschedule mail error: ' . $e->getMessage());
         }
 
-        return back()->with('success',
-            "Booking {$booking->customer->name} berhasil direschedule ke " .
-            \Carbon\Carbon::parse($request->booking_date)->isoFormat('D MMM YYYY') .
-            " jam {$request->booking_time}."
-        );
+        return back()->with('success', 'Booking berhasil direschedule.');
     }
 
     public function admin()
     {
-        if (auth()->user()->role !== 'admin') return redirect('/');
+        if (!auth()->check() || auth()->user()->role !== 'admin') {
+            return redirect('/');
+        }
 
         $bookings = Booking::with('customer')
-            ->where('booking_date', '>=', now()->subDays(3)->toDateString()) 
+            ->where('booking_date', '>=', now()->subDays(3)->toDateString())
             ->orderBy('booking_date', 'desc')
             ->orderBy('booking_time', 'asc')
             ->get();
 
         $capacity = (int) Setting::get('capacity', 1);
-        $today = now()->toDateString();
+        $today    = now()->toDateString();
 
         return view('admin', compact('bookings', 'capacity', 'today'));
     }
@@ -203,7 +223,7 @@ class BookingController extends Controller
 
         Setting::set('capacity', $request->capacity);
 
-        return back()->with('success', 'Kapasitas berhasil diupdate menjadi ' . $request->capacity . ' orang/jam!');
+        return back()->with('success', 'Kapasitas berhasil diupdate.');
     }
 
     public function start($id)
@@ -212,60 +232,54 @@ class BookingController extends Controller
         return back()->with('success', 'Layanan dimulai!');
     }
 
+    public function complete($id)
+    {
+        Booking::findOrFail($id)->update(['status' => 'completed']);
+        return back()->with('success', 'Layanan selesai!');
+    }
+
     public function cancel($id)
     {
         $booking = Booking::with('customer')->findOrFail($id);
 
-        // Ambil data sebelum delete
-        $customerName = $booking->customer->name;
-        $customerEmail = $booking->customer->email;
-        $bookingDate  = $booking->booking_date;
-        $bookingTime  = $booking->booking_time;
-
-        $booking->delete(); // delete dulu
+        $booking->delete();
 
         try {
-                Mail::to($customerEmail)
-                    ->queue(new BookingCancelledMail($customerName, $bookingDate, $bookingTime));
-            } catch (\Exception $e) {
-                Log::error('Cancel mail error: ' . $e->getMessage());
-            }
+            Mail::to($booking->customer->email)
+                ->queue(new BookingCancelledMail(
+                    $booking->customer->name,
+                    $booking->booking_date,
+                    $booking->booking_time
+                ));
+        } catch (\Exception $e) {
+            Log::error('Cancel mail error: ' . $e->getMessage());
+        }
 
-        return back()->with('success', 'Booking dibatalkan dan slot kembali tersedia.');
-    }
-
-    public function complete($id)
-    {
-        Booking::findOrFail($id)->update(['status' => 'completed']);
-        return back()->with('success', 'Layanan telah selesai!');
+        return back()->with('success', 'Booking dibatalkan dan slot tersedia kembali.');
     }
 
     public function availableSlots(Request $request)
     {
-        $date     = $request->date;
+        $date      = $request->date;
         $excludeId = $request->exclude_id;
-        $capacity = (int) Setting::get('capacity', 1);
-        $now      = now();
-
-        $allSlots = [
-            '08:00', '09:00', '10:00', '11:00',
-            '13:00', '14:00', '15:00', '16:00',
-            '17:00', '18:00', '19:00', '20:00'
-        ];
+        $capacity  = (int) Setting::get('capacity', 1);
+        $now       = now();
 
         $availableSlots = [];
 
-        foreach ($allSlots as $slot) {
-            if ($date === $now->toDateString()) {
-                $slotTime = \Carbon\Carbon::createFromFormat('H:i', $slot);
-                if ($slotTime->isPast()) {
-                    continue;
-                }
+        foreach ($this->timeSlots as $slot) {
+
+            $slotTime = Carbon::createFromFormat(
+                'Y-m-d H:i',
+                $date . ' ' . $slot
+            );
+
+            if ($slotTime->isPast()) {
+                continue;
             }
 
-            // Cek kapasitas slot (exclude booking yang sedang direschedule)
             $bookedCount = Booking::where('booking_date', $date)
-                ->whereRaw("TIME_FORMAT(booking_time, '%H:%i') = ?", [$slot])
+                ->where('booking_time', $slot . ':00')
                 ->whereIn('status', ['active', 'on-progress'])
                 ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
                 ->count();
@@ -278,4 +292,3 @@ class BookingController extends Controller
         return response()->json($availableSlots);
     }
 }
-
