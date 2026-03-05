@@ -13,19 +13,68 @@
     .date-card { flex: 0 0 auto; scroll-snap-align: start; }
 </style>
 
-<div x-data="{ 
+<div x-data="{
     selectedDate: '{{ $date }}',
     selectedSlot: '',
     openModal: false,
     currentMonth: '{{ \Carbon\Carbon::parse($date)->format('m') }}',
 
-    scrollLeft() { $refs.slider.scrollBy({ left: -300, behavior: 'smooth' }) },
-    scrollRight() { $refs.slider.scrollBy({ left: 300, behavior: 'smooth' }) },
-    
+    bookedSlots: {{ json_encode($bookedSlots) }},
+    now: '{{ now()->format('H:i') }}',
+    today: '{{ now()->toDateString() }}',
+
+    isBooked(slot) {
+        return this.bookedSlots.includes(slot);
+    },
+
+    isPast(slot) {
+        return this.selectedDate === this.today && this.now >= slot;
+    },
+
+    isUnavailable(slot) {
+        return this.isBooked(slot) || this.isPast(slot);
+    },
+
+    slotLabel(slot) {
+        if (this.isBooked(slot)) return 'Penuh';
+        if (this.isPast(slot)) return 'Selesai';
+        return 'Tersedia';
+    },
+
+    slotLabelColor(slot) {
+        if (this.isBooked(slot)) return 'text-red-300';
+        if (this.isPast(slot)) return 'text-slate-300';
+        return 'text-green-500';
+    },
+
+    slotBtnClass(slot) {
+        if (this.isUnavailable(slot))
+            return 'bg-slate-50 border-transparent text-slate-200 cursor-not-allowed';
+        return 'bg-white border-slate-100 hover:border-black active:scale-95 shadow-sm';
+    },
+
+    async refreshSlots() {
+        try {
+            const res  = await fetch('/?date=' + this.selectedDate + '&json=1');
+            const data = await res.json();
+            this.bookedSlots = data.bookedSlots;
+            this.now         = data.now;
+        } catch(e) {
+            console.error('Gagal refresh slots:', e);
+        }
+    },
+
+    scrollLeft()  { this.$refs.slider.scrollBy({ left: -300, behavior: 'smooth' }) },
+    scrollRight() { this.$refs.slider.scrollBy({ left:  300, behavior: 'smooth' }) },
+
     selectDate(date) {
         window.location.href = '/?date=' + date;
     }
-}" class="max-w-xl mx-auto pb-24 px-4">
+}"
+x-init="
+    setInterval(() => refreshSlots(), 1000);
+"
+class="max-w-xl mx-auto pb-24 px-4">
 
     {{-- Header --}}
     <div class="py-8 text-center">
@@ -44,7 +93,7 @@
     <div class="mb-4">
         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block italic">Periode Booking</label>
         <div class="relative bg-white border-2 border-slate-100 rounded-3xl p-1 shadow-sm focus-within:border-black transition-all">
-            <select x-model="currentMonth" @change="window.location.href = '/?date=2026-' + $event.target.value + '-01'" 
+            <select x-model="currentMonth" @change="window.location.href = '/?date=2026-' + $event.target.value + '-01'"
                     class="w-full bg-transparent font-black text-slate-900 py-3 px-4 outline-none appearance-none cursor-pointer uppercase">
                 @for($m = 1; $m <= 12; $m++)
                     @php $monthDate = \Carbon\Carbon::create(2026, $m, 1); @endphp
@@ -72,17 +121,17 @@
                 </button>
             </div>
         </div>
-        
+
         <div x-ref="slider" class="date-slider-container hide-scrollbar">
             @php
                 $startOfMonth = \Carbon\Carbon::parse($date)->startOfMonth();
-                $daysInMonth = $startOfMonth->daysInMonth;
+                $daysInMonth  = $startOfMonth->daysInMonth;
             @endphp
             @for($i = 0; $i < $daysInMonth; $i++)
-                @php 
+                @php
                     $targetDate = $startOfMonth->copy()->addDays($i);
-                    $active = $targetDate->toDateString() == $date;
-                    $isPast = $targetDate->isPast() && !$targetDate->isToday();
+                    $active     = $targetDate->toDateString() == $date;
+                    $isPast     = $targetDate->isPast() && !$targetDate->isToday();
                 @endphp
                 <button @click="if(!{{ $isPast ? 'true' : 'false' }}) selectDate('{{ $targetDate->toDateString() }}')"
                     class="date-card w-20 h-28 rounded-[2rem] flex flex-col items-center justify-center transition-all border-2
@@ -105,39 +154,34 @@
 
         <div class="grid grid-cols-3 gap-4">
             @foreach($timeSlots as $slot)
-                @php 
-                    $slotTime = substr($slot, 0, 12);
-                    $isBooked = in_array($slotTime, $bookedSlots); 
-                    $isPastTime = now()->toDateString() == $date && now()->format('H:i') > $slotTime;
-                @endphp
-                <button 
-                    @click="if(!{{ $isBooked || $isPastTime ? 'true' : 'false' }}) { selectedSlot = '{{ $slotTime }}'; openModal = true }"
-                    class="relative py-6 rounded-[2rem] border-2 text-center transition-all
-                    {{ $isBooked || $isPastTime ? 'bg-slate-50 border-transparent text-slate-200 cursor-not-allowed' : 'bg-white border-slate-100 hover:border-black active:scale-95 shadow-sm' }}">
-                    <span class="block font-black text-xl tracking-tighter italic">{{ $slotTime }}</span>
-                    <span class="text-[8px] font-black uppercase tracking-widest {{ $isBooked ? 'text-red-300' : ($isPastTime ? 'text-slate-300' : 'text-green-500') }}">
-                        {{ $isBooked ? 'Penuh' : ($isPastTime ? 'Selesai' : 'Tersedia') }}
-                    </span>
+                <button
+                    @click="if(!isUnavailable('{{ $slot }}')) { selectedSlot = '{{ $slot }}'; openModal = true }"
+                    :class="slotBtnClass('{{ $slot }}')"
+                    class="relative py-6 rounded-[2rem] border-2 text-center transition-all">
+                    <span class="block font-black text-xl tracking-tighter italic">{{ $slot }}</span>
+                    <span class="text-[8px] font-black uppercase tracking-widest"
+                          :class="slotLabelColor('{{ $slot }}')"
+                          x-text="slotLabel('{{ $slot }}')"></span>
                 </button>
             @endforeach
         </div>
     </div>
 
     {{-- Modal Konfirmasi --}}
-    <div x-show="openModal" 
-        x-cloak 
+    <div x-show="openModal"
+        x-cloak
         class="fixed inset-0 z-[100] flex items-center justify-center p-4"
         x-transition:enter="transition ease-out duration-300"
         x-transition:enter-start="opacity-0"
         x-transition:enter-end="opacity-100">
-        
+
         <div @click="openModal = false" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-        
+
         <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 relative shadow-2xl z-10"
                 x-transition:enter="transition ease-out duration-300"
                 x-transition:enter-start="scale-90 opacity-0"
                 x-transition:enter-end="scale-100 opacity-100">
-            
+
             <h3 class="text-3xl font-black italic tracking-tighter text-slate-900 uppercase mb-6">
                 KONFIRMASI<span class="text-amber-500">.</span>
             </h3>
@@ -159,17 +203,17 @@
                     <div class="space-y-4 mb-6">
                         <div>
                             <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block tracking-widest italic">Nama Lengkap</label>
-                            <input type="text" name="name" required placeholder="NAMA" 
+                            <input type="text" name="name" required placeholder="NAMA"
                                 class="w-full bg-slate-50 border-2 border-transparent focus:border-black p-4 rounded-2xl font-bold outline-none uppercase transition-all">
                         </div>
                         <div>
                             <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block tracking-widest italic">Nomor WhatsApp</label>
-                            <input type="tel" name="phone" required placeholder="0812XXXXXXXX" 
+                            <input type="tel" name="phone" required placeholder="0812XXXXXXXX"
                                 class="w-full bg-slate-50 border-2 border-transparent focus:border-black p-4 rounded-2xl font-bold outline-none transition-all">
                         </div>
                         <div>
                             <label class="text-[10px] font-black text-slate-400 uppercase ml-2 mb-1 block tracking-widest italic">Email</label>
-                            <input type="email" name="email" required placeholder="youremail@example.com" 
+                            <input type="email" name="email" required placeholder="youremail@example.com"
                                 class="w-full bg-slate-50 border-2 border-transparent focus:border-black p-4 rounded-2xl font-bold outline-none transition-all">
                         </div>
                     </div>
@@ -180,12 +224,12 @@
                     <span class="font-black text-slate-900 uppercase italic" x-text="selectedDate + ' @ ' + selectedSlot"></span>
                 </div>
 
-                <button type="submit" 
+                <button type="submit"
                     class="w-full bg-black text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-500 transition shadow-lg active:scale-95">
                     AMANKAN SLOT SEKARANG
                 </button>
-                
-                <button type="button" @click="openModal = false" 
+
+                <button type="button" @click="openModal = false"
                     class="w-full py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 hover:text-red-500 transition">
                     Batal
                 </button>
@@ -193,66 +237,51 @@
         </div>
     </div>
 
+    {{-- Success Modal --}}
     @if($successBooking)
-        <div 
+        <div
             x-data="{ openSuccess: true }"
             x-show="openSuccess"
             x-cloak
             class="fixed inset-0 z-[200] flex items-center justify-center p-4"
             x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-        >
+            x-transition:enter-end="opacity-100">
+
             <div @click="openSuccess = false" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
 
             <div class="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden border-2 border-slate-50 z-10">
-
                 <div class="bg-black p-8 text-center">
                     <div class="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
                         </svg>
                     </div>
-                    <h2 class="text-white font-black italic text-2xl uppercase tracking-tighter">
-                        Booking Berhasil!
-                    </h2>
-                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">
-                        Tunjukkan tiket ini ke kasir
-                    </p>
+                    <h2 class="text-white font-black italic text-2xl uppercase tracking-tighter">Booking Berhasil!</h2>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Tunjukkan tiket ini ke kasir</p>
                 </div>
 
                 <div class="p-8 space-y-6">
                     <div class="flex justify-between border-b border-dashed pb-4">
                         <span class="text-xs font-black text-slate-400 uppercase">Pelanggan</span>
-                        <span class="text-xs font-black text-slate-900 uppercase italic">
-                            {{ $successBooking->customer->name }}
-                        </span>
+                        <span class="text-xs font-black text-slate-900 uppercase italic">{{ $successBooking->customer->name }}</span>
                     </div>
-
                     <div class="flex justify-between border-b border-dashed pb-4">
                         <span class="text-xs font-black text-slate-400 uppercase">Tanggal</span>
-                        <span class="text-xs font-black text-slate-900 uppercase italic">
-                            {{ $successBooking->booking_date }}
-                        </span>
+                        <span class="text-xs font-black text-slate-900 uppercase italic">{{ $successBooking->booking_date }}</span>
                     </div>
-
                     <div class="text-center py-4 bg-slate-50 rounded-2xl">
-                        <span class="block text-[10px] font-black text-slate-400 uppercase mb-1">
-                            Jam Kedatangan
-                        </span>
-                        <span class="text-5xl font-black italic tracking-tighter text-slate-900">
-                            {{ substr($successBooking->booking_time, 0, 5) }}
-                        </span>
+                        <span class="block text-[10px] font-black text-slate-400 uppercase mb-1">Jam Kedatangan</span>
+                        <span class="text-5xl font-black italic tracking-tighter text-slate-900">{{ substr($successBooking->booking_time, 0, 5) }}</span>
                     </div>
-
-                    <button 
-                        @click="openSuccess = false"
+                    <button @click="openSuccess = false"
                         class="block w-full bg-slate-100 text-center py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition">
                         Tutup
                     </button>
                 </div>
             </div>
         </div>
-        @endif
+    @endif
+
 </div>
 @endsection

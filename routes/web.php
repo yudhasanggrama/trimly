@@ -1,27 +1,26 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use Illuminate\Support\Facades\Route;
 
-// Guest & User Routes
+// ── Public / Customer ────────────────────────────────────
 Route::get('/', [BookingController::class, 'index'])->name('home');
 Route::post('/book', [BookingController::class, 'store'])->name('booking.store');
-Route::get('/booking/success/{id}', [BookingController::class, 'success'])->name('booking.success');
 
-// Auth Routes
+// ── Auth ─────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register'])->name('register');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// Admin Routes
-Route::middleware(['auth'])->group(function () {
-    Route::get('/admin', [BookingController::class, 'admin'])->name('admin');
-    Route::get('/admin/stream', [BookingController::class, 'stream'])->name('admin.stream');
-    Route::post('/admin/start/{id}', [BookingController::class, 'start'])->name('admin.start');
-    Route::post('/admin/cancel/{id}', [BookingController::class, 'cancel'])->name('admin.cancel');
-    Route::post('/admin/complete/{id}', [BookingController::class, 'complete'])->name('admin.complete');
-    Route::put('/admin/reschedule/{id}', [BookingController::class, 'reschedule'])->name('admin.reschedule');
-    Route::post('/admin/settings', [BookingController::class, 'updateSettings'])->name('admin.settings');
-    Route::get('/admin/available-slots', [BookingController::class, 'availableSlots'])->name('admin.available-slots');
+// ── Admin ─────────────────────────────────────────────────
+Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/',                      [AdminController::class, 'index'])->name('index');
+    Route::post('/start/{id}',           [AdminController::class, 'start'])->name('start');
+    Route::post('/cancel/{id}',          [AdminController::class, 'cancel'])->name('cancel');
+    Route::post('/complete/{id}',        [AdminController::class, 'complete'])->name('complete');
+    Route::put('/reschedule/{id}',       [AdminController::class, 'reschedule'])->name('reschedule');
+    Route::post('/settings',             [AdminController::class, 'updateSettings'])->name('settings');
+    Route::get('/available-slots',       [AdminController::class, 'availableSlots'])->name('available-slots');
 });

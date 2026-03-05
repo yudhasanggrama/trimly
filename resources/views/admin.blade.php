@@ -31,7 +31,6 @@
                 <input type="hidden" name="_method" value="PUT">
 
                 <div class="space-y-4">
-                    {{-- Tanggal --}}
                     <div>
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">Tanggal Baru</label>
                         <input type="date" name="booking_date"
@@ -42,19 +41,16 @@
                             class="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-black rounded-2xl text-sm font-bold outline-none transition-all">
                     </div>
 
-                    {{-- Jam --}}
                     <div>
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block italic">
                             Jam Baru
                             <span x-show="loadingSlots" class="ml-1 text-amber-500 normal-case font-bold">Loading...</span>
                         </label>
 
-                        {{-- Loading state --}}
                         <div x-show="loadingSlots" class="w-full px-4 py-3 bg-slate-50 rounded-2xl text-sm text-slate-400 font-bold animate-pulse">
                             Mengecek slot tersedia...
                         </div>
 
-                        {{-- Slot tersedia --}}
                         <div x-show="!loadingSlots && availableSlots.length > 0">
                             <div class="relative">
                                 <select name="booking_time" required
@@ -69,13 +65,11 @@
                             </div>
                         </div>
 
-                        {{-- Tidak ada slot --}}
                         <div x-show="!loadingSlots && availableSlots.length === 0 && rescheduleDate !== ''"
                             class="w-full px-4 py-3 bg-red-50 border-2 border-red-100 rounded-2xl text-xs font-black text-red-500 uppercase">
                             ✕ Tidak ada slot tersedia di tanggal ini
                         </div>
 
-                        {{-- Belum pilih tanggal --}}
                         <div x-show="!loadingSlots && rescheduleDate === ''"
                             class="w-full px-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold text-slate-400">
                             Pilih tanggal terlebih dahulu
@@ -137,7 +131,135 @@
         </div>
     @endif
 
-    {{-- Filter Bar --}}
+    {{-- ==================== STATS CARDS ==================== --}}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {{-- Total Hari Ini --}}
+        <div class="bg-black text-white rounded-3xl p-5 relative overflow-hidden">
+            <div class="absolute -top-4 -right-4 w-20 h-20 bg-amber-500/20 rounded-full"></div>
+            <div class="absolute -bottom-6 -left-2 w-16 h-16 bg-white/5 rounded-full"></div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Hari Ini</p>
+            <p class="text-4xl font-black italic tracking-tighter text-white">{{ $stats['today'] }}</p>
+            <p class="text-[10px] font-bold text-amber-400 mt-1 uppercase">booking</p>
+        </div>
+
+        {{-- Active --}}
+        <div class="bg-green-500 text-white rounded-3xl p-5 relative overflow-hidden">
+            <div class="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full"></div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-green-100 mb-2">Menunggu</p>
+            <p class="text-4xl font-black italic tracking-tighter">{{ $stats['active'] }}</p>
+            <p class="text-[10px] font-bold text-green-100 mt-1 uppercase">antrian aktif</p>
+        </div>
+
+        {{-- On Progress --}}
+        <div class="bg-blue-600 text-white rounded-3xl p-5 relative overflow-hidden">
+            <div class="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full"></div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-blue-200 mb-2">On Progress</p>
+            <p class="text-4xl font-black italic tracking-tighter">{{ $stats['on_progress'] }}</p>
+            <p class="text-[10px] font-bold text-blue-200 mt-1 uppercase">sedang dikerjakan</p>
+        </div>
+
+        {{-- Completed --}}
+        <div class="bg-white border-2 border-slate-100 rounded-3xl p-5 relative overflow-hidden shadow-sm">
+            <div class="absolute -top-4 -right-4 w-20 h-20 bg-amber-50 rounded-full"></div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Selesai</p>
+            <p class="text-4xl font-black italic tracking-tighter text-slate-900">{{ $stats['completed'] }}</p>
+            <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase">hari ini</p>
+        </div>
+    </div>
+
+    {{-- ==================== GRAFIK PENGUNJUNG ==================== --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+        {{-- Chart Utama: Tren 7 Hari --}}
+        <div class="lg:col-span-2 bg-white border-2 border-slate-100 rounded-3xl p-6 shadow-sm">
+            <div class="flex items-start justify-between mb-5">
+                <div>
+                    <h3 class="text-base font-black italic tracking-tighter text-slate-900 uppercase">
+                        Tren Pengunjung<span class="text-amber-500">.</span>
+                    </h3>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">7 hari terakhir</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="switchChart('week')" id="btn-week"
+                        class="chart-tab active-tab px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all bg-black text-white">
+                        7 Hari
+                    </button>
+                    <button onclick="switchChart('month')" id="btn-month"
+                        class="chart-tab px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all bg-slate-100 text-slate-500">
+                        30 Hari
+                    </button>
+                </div>
+            </div>
+
+            <div class="relative h-48 sm:h-56">
+                <canvas id="visitorChart"></canvas>
+            </div>
+
+            {{-- Legend --}}
+            <div class="flex gap-4 mt-4 pt-4 border-t-2 border-slate-50">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                    <span class="text-[10px] font-black text-slate-400 uppercase">Total Booking</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-slate-900"></div>
+                    <span class="text-[10px] font-black text-slate-400 uppercase">Selesai</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- Chart Kanan: Distribusi Per Jam --}}
+        <div class="bg-white border-2 border-slate-100 rounded-3xl p-6 shadow-sm">
+            <div class="mb-5">
+                <h3 class="text-base font-black italic tracking-tighter text-slate-900 uppercase">
+                    Jam Sibuk<span class="text-amber-500">.</span>
+                </h3>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Hari ini per jam</p>
+            </div>
+
+            {{-- Horizontal Bar Chart Manual --}}
+            <div class="space-y-3" id="hourly-bars">
+                @php
+                    $hourlyData = $stats['hourly'] ?? [];
+                    $maxHourly = max(array_values($hourlyData) ?: [1]);
+                @endphp
+                @foreach($hourlyData as $hour => $count)
+                <div class="flex items-center gap-3">
+                    <span class="text-[10px] font-black text-slate-400 w-10 text-right shrink-0">{{ $hour }}</span>
+                    <div class="flex-1 bg-slate-50 rounded-full h-5 overflow-hidden">
+                        <div class="h-full rounded-full transition-all duration-700 flex items-center justify-end pr-2
+                            {{ $count == $maxHourly ? 'bg-amber-500' : 'bg-slate-200' }}"
+                            style="width: {{ $maxHourly > 0 ? round(($count / $maxHourly) * 100) : 0 }}%">
+                            @if($count > 0)
+                            <span class="text-[8px] font-black {{ $count == $maxHourly ? 'text-black' : 'text-slate-500' }}">{{ $count }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+
+                @if(empty($hourlyData))
+                <div class="text-center py-8">
+                    <p class="text-3xl mb-2">📊</p>
+                    <p class="text-[10px] font-black text-slate-300 uppercase">Belum ada data hari ini</p>
+                </div>
+                @endif
+            </div>
+
+            {{-- Peak hour info --}}
+            @if(!empty($hourlyData) && max(array_values($hourlyData)) > 0)
+            @php
+                $peakHour = array_search(max($hourlyData), $hourlyData);
+            @endphp
+            <div class="mt-4 pt-4 border-t-2 border-slate-50">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Jam Tersibuk</p>
+                <p class="text-2xl font-black italic tracking-tighter text-amber-500 mt-0.5">{{ $peakHour }}</p>
+            </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- ==================== FILTER BAR ==================== --}}
     <div class="bg-white border-2 border-slate-100 rounded-3xl p-5 mb-6 shadow-sm">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
@@ -171,7 +293,6 @@
                 class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">
                 ⬇ Newest
             </button>
-
             <button @click="sortOrder = 'oldest'; applyFilter()"
                 :class="sortOrder === 'oldest' ? 'bg-black text-white' : 'bg-slate-100 text-slate-500'"
                 class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all">
@@ -196,7 +317,7 @@
              data-status="{{ $b->status }}"
              data-date="{{ $b->booking_date }}"
              data-time="{{ $b->booking_time }}"
-             data-name="{{ $b->customer->name }}">
+             data-name="{{ strtolower($b->customer->name) }}">
 
             <div class="flex justify-between items-start mb-4">
                 <div>
@@ -275,7 +396,7 @@
                         data-row
                         data-status="{{ $b->status }}"
                         data-date="{{ $b->booking_date }}"
-                        data-name="{{ $b->customer->name }}">
+                        data-name="{{ strtolower($b->customer->name) }}">
                         <td class="p-4">
                             <div class="font-black text-slate-900 uppercase italic">{{ $b->customer->name }}</div>
                             <div class="text-xs text-slate-400 font-bold mt-0.5">{{ $b->customer->phone }}</div>
@@ -334,10 +455,139 @@
 
 </div>
 
+{{-- Chart.js --}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 <script>
+    // ==================== DATA DARI LARAVEL ====================
+    const chartDataWeek = {
+        labels: @json($chartData['week']['labels']),
+        total:  @json($chartData['week']['total']),
+        done:   @json($chartData['week']['done']),
+    };
+
+    const chartDataMonth = {
+        labels: @json($chartData['month']['labels']),
+        total:  @json($chartData['month']['total']),
+        done:   @json($chartData['month']['done']),
+    };
+
+    // ==================== CHART SETUP ====================
+    let visitorChart = null;
+
+    function buildChart(data) {
+        const ctx = document.getElementById('visitorChart').getContext('2d');
+
+        const gradientTotal = ctx.createLinearGradient(0, 0, 0, 220);
+        gradientTotal.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+        gradientTotal.addColorStop(1, 'rgba(245, 158, 11, 0)');
+
+        const gradientDone = ctx.createLinearGradient(0, 0, 0, 220);
+        gradientDone.addColorStop(0, 'rgba(15, 23, 42, 0.15)');
+        gradientDone.addColorStop(1, 'rgba(15, 23, 42, 0)');
+
+        if (visitorChart) visitorChart.destroy();
+
+        visitorChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: 'Total Booking',
+                        data: data.total,
+                        borderColor: '#f59e0b',
+                        backgroundColor: gradientTotal,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#f59e0b',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        fill: true,
+                        tension: 0.4,
+                    },
+                    {
+                        label: 'Selesai',
+                        data: data.done,
+                        borderColor: '#0f172a',
+                        backgroundColor: gradientDone,
+                        borderWidth: 2,
+                        borderDash: [5, 4],
+                        pointBackgroundColor: '#0f172a',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.4,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        titleColor: '#94a3b8',
+                        bodyColor: '#fff',
+                        titleFont: { size: 10, weight: '900', family: 'inherit' },
+                        bodyFont: { size: 12, weight: '900', family: 'inherit' },
+                        padding: 12,
+                        cornerRadius: 12,
+                        callbacks: {
+                            title: (items) => items[0].label.toUpperCase(),
+                            label: (item) => `  ${item.dataset.label}: ${item.raw} orang`,
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { size: 9, weight: '700' },
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9', lineWidth: 1 },
+                        border: { display: false, dash: [4, 4] },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { size: 9, weight: '700' },
+                            stepSize: 1,
+                            precision: 0,
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function switchChart(mode) {
+        document.querySelectorAll('.chart-tab').forEach(el => {
+            el.classList.remove('bg-black', 'text-white');
+            el.classList.add('bg-slate-100', 'text-slate-500');
+        });
+        const active = document.getElementById('btn-' + mode);
+        active.classList.add('bg-black', 'text-white');
+        active.classList.remove('bg-slate-100', 'text-slate-500');
+
+        buildChart(mode === 'week' ? chartDataWeek : chartDataMonth);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        buildChart(chartDataWeek);
+    });
+
+    // ==================== ALPINE DASHBOARD ====================
     function adminDashboard() {
         return {
-
             filterStatus: 'all',
             filterDate: '{{ $today }}',
             filterSearch: '',
@@ -373,17 +623,12 @@
                     let htmlDocument = parser.parseFromString(text, 'text/html');
 
                     let newTable = htmlDocument.getElementById('booking-table-content');
-                    if (newTable) {
-                        document.getElementById('booking-table-content').innerHTML = newTable.innerHTML;
-                    }
+                    if (newTable) document.getElementById('booking-table-content').innerHTML = newTable.innerHTML;
 
                     let newCards = htmlDocument.getElementById('booking-cards-content');
-                    if (newCards) {
-                        document.getElementById('booking-cards-content').innerHTML = newCards.innerHTML;
-                    }
+                    if (newCards) document.getElementById('booking-cards-content').innerHTML = newCards.innerHTML;
 
                     this.$nextTick(() => this.applyFilter());
-
                 } catch (e) {
                     console.error('Refresh gagal:', e);
                 }
@@ -392,49 +637,35 @@
             },
 
             applyFilter() {
-
                 let rows = Array.from(document.querySelectorAll('[data-row]'));
 
                 rows.forEach(row => {
-
                     const status = row.dataset.status;
                     const date   = row.dataset.date;
-                    const name   = row.dataset.name;
+                    const name   = row.dataset.name; // sudah lowercase dari blade
+
+                    const needle = this.filterSearch.toLowerCase().trim()
+                        .replace(/\s+/g, ' '); // normalize spasi ganda
 
                     const matchStatus = this.filterStatus === 'all' || status === this.filterStatus;
                     const matchDate   = this.filterDate === '' || date === this.filterDate;
-                    const matchSearch = this.filterSearch === '' || 
-                        name.includes(this.filterSearch.toLowerCase());
+                    const matchSearch = needle === '' || name.includes(needle);
 
                     row.style.display = (matchStatus && matchDate && matchSearch) ? '' : 'none';
                 });
 
                 let visibleRows = rows.filter(row => row.style.display !== 'none');
 
-                // 🔥 SORTING FIX (DATE + TIME)
                 visibleRows.sort((a, b) => {
-
-                    const dateTimeA = new Date(
-                        a.dataset.date + ' ' + a.dataset.time
-                    );
-
-                    const dateTimeB = new Date(
-                        b.dataset.date + ' ' + b.dataset.time
-                    );
-
-                    return this.sortOrder === 'newest'
-                        ? dateTimeB - dateTimeA
-                        : dateTimeA - dateTimeB;
+                    const dateTimeA = new Date(a.dataset.date + ' ' + (a.dataset.time || '00:00'));
+                    const dateTimeB = new Date(b.dataset.date + ' ' + (b.dataset.time || '00:00'));
+                    return this.sortOrder === 'newest' ? dateTimeB - dateTimeA : dateTimeA - dateTimeB;
                 });
 
-                visibleRows.forEach(row => {
-                    row.parentNode.appendChild(row);
-                });
+                visibleRows.forEach(row => row.parentNode.appendChild(row));
 
                 const result = document.getElementById('result-count');
-                if (result) {
-                    result.textContent = visibleRows.length;
-                }
+                if (result) result.textContent = visibleRows.length;
             },
 
             resetFilter() {
@@ -442,7 +673,6 @@
                 this.filterDate   = '';
                 this.filterSearch = '';
                 this.sortOrder    = 'newest';
-
                 this.$nextTick(() => this.applyFilter());
             },
 
@@ -456,17 +686,14 @@
 
             async loadSlots(date) {
                 if (!date) return;
-
                 this.loadingSlots = true;
                 this.availableSlots = [];
-
                 try {
                     const res = await fetch(`/admin/available-slots?date=${date}&exclude_id=${this.rescheduleId}`);
                     this.availableSlots = await res.json();
                 } catch (e) {
                     console.error('Gagal load slots:', e);
                 }
-
                 this.loadingSlots = false;
             },
 

@@ -24,7 +24,7 @@
         <a href="{{ route('home') }}" class="hover:text-amber-400 transition text-sm font-bold uppercase">Home</a>
         @auth
             @if(auth()->user()->role == 'admin')
-                <a href="{{ route('admin') }}" class="bg-amber-500 text-black px-4 py-1 rounded-full font-bold hover:bg-amber-400 text-xs uppercase italic">Admin</a>
+                <a href="{{ route('admin.index') }}" class="bg-amber-500 text-black px-4 py-1 rounded-full font-bold hover:bg-amber-400 text-xs uppercase italic">Admin</a>
             @endif
             <form action="{{ route('logout') }}" method="POST" class="m-0">@csrf 
                 <button type="submit" class="text-red-400 hover:text-red-300 text-sm font-bold uppercase">Logout</button>
