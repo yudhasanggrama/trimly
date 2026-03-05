@@ -8,7 +8,7 @@ use Illuminate\Queue\SerializesModels;
 
 class BookingRescheduledMail extends Mailable
 {
-    use Queueable,SerializesModels;
+    use Queueable, SerializesModels;
 
     public $booking;
     public $oldDate;

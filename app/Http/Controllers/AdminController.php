@@ -47,11 +47,6 @@ class AdminController extends Controller
         return view('admin', compact('bookings', 'capacity', 'today', 'stats', 'chartData'));
     }
 
-    /**
-     * Endpoint JSON ringan untuk refresh stats + bookings dari admin dashboard.
-     * Dipanggil oleh Alpine.js setiap beberapa detik — jauh lebih efisien
-     * daripada fetch seluruh halaman HTML.
-     */
     public function liveData(Request $request)
     {
         $today    = now()->toDateString();
