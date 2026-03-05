@@ -11,7 +11,7 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        Customer::firstOrCreate([
+        User::firstOrCreate([
            'name' => 'Admin Trimly',
             'email' => 'admin@trimly.com',
             'phone' => '081234567890',
