@@ -32,18 +32,12 @@ class AdminController extends Controller
         $today    = now()->toDateString();
 
         // ── Stats Cards ──────────────────────────────────────
-        $stats = [
-            'today'       => Booking::whereDate('booking_date', $today)->count(),
-            'active'      => Booking::whereDate('booking_date', $today)->where('status', 'active')->count(),
-            'on_progress' => Booking::whereDate('booking_date', $today)->where('status', 'on-progress')->count(),
-            'completed'   => Booking::whereDate('booking_date', $today)->where('status', 'completed')->count(),
-            'hourly'      => Booking::whereDate('booking_date', $today)
-                                ->selectRaw("TIME_FORMAT(booking_time, '%H:00') as hour, COUNT(*) as total")
-                                ->groupBy('hour')
-                                ->orderBy('hour')
-                                ->pluck('total', 'hour')
-                                ->toArray(),
-        ];
+        $stats = Booking::whereDate('booking_date', $today)
+                    ->selectRaw("count(*) as total, 
+                                count(case when status = 'active' then 1 end) as active,
+                                count(case when status = 'on-progress' then 1 end) as on_progress,
+                                count(case when status = 'completed' then 1 end) as completed")
+                    ->first();
 
         // ── Chart: 7 hari terakhir ───────────────────────────
         [$weekLabels, $weekTotal, $weekDone] = $this->buildChartData(7, 'ddd D/M');
@@ -181,15 +175,25 @@ class AdminController extends Controller
         $labels = [];
         $total  = [];
         $done   = [];
+        $startDate = now()->subDays($days - 1)->toDateString();
 
-        for ($i = $days - 1; $i >= 0; $i--) {
-            $date     = now()->subDays($i)->toDateString();
-            $labels[] = ($i % $labelEvery === 0)
-                ? now()->subDays($i)->isoFormat($format)
-                : '';
-            $total[]  = Booking::whereDate('booking_date', $date)->count();
-            $done[]   = Booking::whereDate('booking_date', $date)->where('status', 'completed')->count();
-        }
+        // Ambil semua data dalam 1 query saja
+            $rawData = Booking::where('booking_date', '>=', $startDate)
+                ->selectRaw("booking_date, 
+                            count(*) as total_count, 
+                            count(case when status = 'completed' then 1 end) as done_count")
+                ->groupBy('booking_date')
+                ->get()
+                ->keyBy('booking_date');
+
+            for ($i = $days - 1; $i >= 0; $i--) {
+                $date = now()->subDays($i)->toDateString();
+                $labels[] = ($i % $labelEvery === 0) ? now()->subDays($i)->isoFormat($format) : '';
+                
+                // Ambil dari koleksi hasil query di atas, bukan query lagi
+                $total[] = $rawData->get($date)->total_count ?? 0;
+                $done[]  = $rawData->get($date)->done_count ?? 0;
+            }
 
         return [$labels, $total, $done];
     }
