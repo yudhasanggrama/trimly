@@ -177,23 +177,28 @@ class AdminController extends Controller
         $done   = [];
         $startDate = now()->subDays($days - 1)->toDateString();
 
-        // Ambil semua data dalam 1 query saja
-            $rawData = Booking::where('booking_date', '>=', $startDate)
-                ->selectRaw("booking_date, 
-                            count(*) as total_count, 
-                            count(case when status = 'completed' then 1 end) as done_count")
-                ->groupBy('booking_date')
-                ->get()
-                ->keyBy('booking_date');
+        // Query cerdas: Ambil semua data dalam satu tarikan napas
+        $rawData = Booking::where('booking_date', '>=', $startDate)
+            ->selectRaw("booking_date, 
+                        count(*) as total_count, 
+                        count(case when status = 'completed' then 1 end) as done_count")
+            ->groupBy('booking_date')
+            ->get()
+            ->keyBy('booking_date');
 
-            for ($i = $days - 1; $i >= 0; $i--) {
-                $date = now()->subDays($i)->toDateString();
-                $labels[] = ($i % $labelEvery === 0) ? now()->subDays($i)->isoFormat($format) : '';
-                
-                // Ambil dari koleksi hasil query di atas, bukan query lagi
-                $total[] = $rawData->get($date)->total_count ?? 0;
-                $done[]  = $rawData->get($date)->done_count ?? 0;
-            }
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->toDateString();
+            
+            // Label hanya muncul sesuai interval labelEvery
+            $labels[] = ($i % $labelEvery === 0) 
+                ? now()->subDays($i)->translatedFormat($format) 
+                : '';
+            
+            // Ambil data dari hasil query di atas, jika tidak ada isi 0
+            $dayData = $rawData->get($date);
+            $total[] = $dayData ? $dayData->total_count : 0;
+            $done[]  = $dayData ? $dayData->done_count : 0;
+        }
 
         return [$labels, $total, $done];
     }
