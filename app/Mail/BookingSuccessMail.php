@@ -15,7 +15,7 @@ class BookingSuccessMail extends Mailable implements ShouldQueue
 
     public function __construct($booking)
     {
-        $this->booking = $booking;
+        $this->booking = $booking->loadMissing('customer');
     }
 
     public function build()
