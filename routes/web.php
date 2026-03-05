@@ -30,6 +30,10 @@ Route::middleware(['auth', AdminMiddleware::class])->prefix('admin')->name('admi
 });
 
 Route::get('/test-mail', function () {
-    Mail::raw('Test email', fn($m) => $m->to('raditbrian04@gmail.com')->subject('Test Trimly'));
-    return 'Mail sent!';
+    try {
+        Mail::raw('Test email', fn($m) => $m->to('raditbrian04@gmail.com')->subject('Test Trimly'));
+        return 'Mail sent!';
+    } catch (\Exception $e) {
+        return $e->getMessage();
+    }
 });
