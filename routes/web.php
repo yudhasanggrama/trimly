@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Middleware\AdminMiddleware;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
 // ── Public / Customer ────────────────────────────────────
@@ -26,4 +27,9 @@ Route::middleware(['auth', AdminMiddleware::class])->prefix('admin')->name('admi
     Route::put('/reschedule/{id}',       [AdminController::class, 'reschedule'])->name('reschedule');
     Route::post('/settings',             [AdminController::class, 'updateSettings'])->name('settings');
     Route::get('/available-slots',       [AdminController::class, 'availableSlots'])->name('available-slots');
+});
+
+Route::get('/test-mail', function () {
+    Mail::raw('Test email', fn($m) => $m->to('raditbrian04@gmail.com')->subject('Test Trimly'));
+    return 'Mail sent!';
 });
