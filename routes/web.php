@@ -43,3 +43,13 @@ Route::get('/flush-queue', function () {
     Artisan::call('queue:clear', ['connection' => 'database']);
     return 'Queue flushed!';
 });
+
+Route::get('/check-failed-jobs', function () {
+    $jobs = DB::table('failed_jobs')->latest()->take(3)->get();
+    foreach ($jobs as $job) {
+        $payload = json_decode($job->payload);
+        echo "<pre>";
+        echo "Exception: " . $job->exception . "\n\n";
+        echo "</pre><hr>";
+    }
+});
