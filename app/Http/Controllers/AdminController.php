@@ -25,19 +25,13 @@ class AdminController extends Controller
         $bookings = Booking::with('customer')
             ->where('booking_date', '>=', now()->subDays(3)->toDateString())
             ->orderBy('booking_date', 'desc')
-            ->orderBy('booking_time', 'asc')
-            ->get();
+            ->paginate(15);
 
         $capacity = (int) Setting::get('capacity', 1);
         $today    = now()->toDateString();
 
         // ── Stats Cards ──────────────────────────────────────
-        $stats = Booking::whereDate('booking_date', $today)
-                    ->selectRaw("count(*) as total, 
-                                count(case when status = 'active' then 1 end) as active,
-                                count(case when status = 'on-progress' then 1 end) as on_progress,
-                                count(case when status = 'completed' then 1 end) as completed")
-                    ->first();
+        $stats = $this->buildStats($today);
 
         // ── Chart: 7 hari terakhir ───────────────────────────
         [$weekLabels, $weekTotal, $weekDone] = $this->buildChartData(7, 'ddd D/M');
@@ -51,6 +45,36 @@ class AdminController extends Controller
         ];
 
         return view('admin', compact('bookings', 'capacity', 'today', 'stats', 'chartData'));
+    }
+
+    /**
+     * Endpoint JSON ringan untuk refresh stats + bookings dari admin dashboard.
+     * Dipanggil oleh Alpine.js setiap beberapa detik — jauh lebih efisien
+     * daripada fetch seluruh halaman HTML.
+     */
+    public function liveData(Request $request)
+    {
+        $today    = now()->toDateString();
+        $stats    = $this->buildStats($today);
+
+        $bookings = Booking::with('customer')
+            ->where('booking_date', '>=', now()->subDays(3)->toDateString())
+            ->orderBy('booking_date', 'desc')
+            ->get()
+            ->map(fn($b) => [
+                'id'           => $b->id,
+                'customer_name'=> $b->customer->name,
+                'customer_phone'=> $b->customer->phone,
+                'booking_date' => $b->booking_date,
+                'booking_time' => substr($b->booking_time, 0, 5),
+                'status'       => $b->status,
+                'updated_at'   => $b->updated_at->format('H:i'),
+            ]);
+
+        return response()->json([
+            'stats'    => $stats,
+            'bookings' => $bookings,
+        ]);
     }
 
     public function start($id)
@@ -169,7 +193,43 @@ class AdminController extends Controller
         return response()->json($availableSlots);
     }
 
-    // ── Helper ───────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────
+
+    private function buildStats(string $today): array
+    {
+        $raw = Booking::whereDate('booking_date', $today)
+            ->selectRaw("
+                count(*) as total,
+                count(case when status = 'active' then 1 end) as active,
+                count(case when status = 'on-progress' then 1 end) as on_progress,
+                count(case when status = 'completed' then 1 end) as completed
+            ")
+            ->first();
+
+        // Distribusi per jam — untuk bar chart horizontal di admin
+        $hourlyRaw = Booking::whereDate('booking_date', $today)
+            ->whereIn('status', ['active', 'on-progress', 'completed'])
+            ->selectRaw("TIME_FORMAT(booking_time, '%H:%i') as hour, count(*) as total")
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->pluck('total', 'hour')
+            ->toArray();
+
+        // Pastikan semua slot muncul meski 0
+        $hourly = [];
+        foreach ($this->timeSlots as $slot) {
+            $hourly[$slot] = $hourlyRaw[$slot] ?? 0;
+        }
+
+        return [
+            'today'       => $raw->total,
+            'active'      => $raw->active,
+            'on_progress' => $raw->on_progress,
+            'completed'   => $raw->completed,
+            'hourly'      => $hourly,
+        ];
+    }
+
     private function buildChartData(int $days, string $format, int $labelEvery = 1): array
     {
         $labels = [];
@@ -177,10 +237,9 @@ class AdminController extends Controller
         $done   = [];
         $startDate = now()->subDays($days - 1)->toDateString();
 
-        // Query cerdas: Ambil semua data dalam satu tarikan napas
         $rawData = Booking::where('booking_date', '>=', $startDate)
-            ->selectRaw("booking_date, 
-                        count(*) as total_count, 
+            ->selectRaw("booking_date,
+                        count(*) as total_count,
                         count(case when status = 'completed' then 1 end) as done_count")
             ->groupBy('booking_date')
             ->get()
@@ -188,13 +247,11 @@ class AdminController extends Controller
 
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = now()->subDays($i)->toDateString();
-            
-            // Label hanya muncul sesuai interval labelEvery
-            $labels[] = ($i % $labelEvery === 0) 
-                ? now()->subDays($i)->translatedFormat($format) 
+
+            $labels[] = ($i % $labelEvery === 0)
+                ? now()->subDays($i)->translatedFormat($format)
                 : '';
-            
-            // Ambil data dari hasil query di atas, jika tidak ada isi 0
+
             $dayData = $rawData->get($date);
             $total[] = $dayData ? $dayData->total_count : 0;
             $done[]  = $dayData ? $dayData->done_count : 0;

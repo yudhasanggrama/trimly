@@ -138,7 +138,7 @@
             <div class="absolute -top-4 -right-4 w-20 h-20 bg-amber-500/20 rounded-full"></div>
             <div class="absolute -bottom-6 -left-2 w-16 h-16 bg-white/5 rounded-full"></div>
             <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Hari Ini</p>
-            <p class="text-4xl font-black italic tracking-tighter text-white">{{ $stats['today'] }}</p>
+            <p class="text-4xl font-black italic tracking-tighter text-white" x-text="stats.today">{{ $stats['today'] }}</p>
             <p class="text-[10px] font-bold text-amber-400 mt-1 uppercase">booking</p>
         </div>
 
@@ -146,7 +146,7 @@
         <div class="bg-green-500 text-white rounded-3xl p-5 relative overflow-hidden">
             <div class="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full"></div>
             <p class="text-[9px] font-black uppercase tracking-widest text-green-100 mb-2">Menunggu</p>
-            <p class="text-4xl font-black italic tracking-tighter">{{ $stats['active'] }}</p>
+            <p class="text-4xl font-black italic tracking-tighter" x-text="stats.active">{{ $stats['active'] }}</p>
             <p class="text-[10px] font-bold text-green-100 mt-1 uppercase">antrian aktif</p>
         </div>
 
@@ -154,7 +154,7 @@
         <div class="bg-blue-600 text-white rounded-3xl p-5 relative overflow-hidden">
             <div class="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full"></div>
             <p class="text-[9px] font-black uppercase tracking-widest text-blue-200 mb-2">On Progress</p>
-            <p class="text-4xl font-black italic tracking-tighter">{{ $stats['on_progress'] }}</p>
+            <p class="text-4xl font-black italic tracking-tighter" x-text="stats.on_progress">{{ $stats['on_progress'] }}</p>
             <p class="text-[10px] font-bold text-blue-200 mt-1 uppercase">sedang dikerjakan</p>
         </div>
 
@@ -162,7 +162,7 @@
         <div class="bg-white border-2 border-slate-100 rounded-3xl p-5 relative overflow-hidden shadow-sm">
             <div class="absolute -top-4 -right-4 w-20 h-20 bg-amber-50 rounded-full"></div>
             <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Selesai</p>
-            <p class="text-4xl font-black italic tracking-tighter text-slate-900">{{ $stats['completed'] }}</p>
+            <p class="text-4xl font-black italic tracking-tighter text-slate-900" x-text="stats.completed">{{ $stats['completed'] }}</p>
             <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase">hari ini</p>
         </div>
     </div>
@@ -228,7 +228,7 @@
                     <span class="text-[10px] font-black text-slate-400 w-10 text-right shrink-0">{{ $hour }}</span>
                     <div class="flex-1 bg-slate-50 rounded-full h-5 overflow-hidden">
                         <div class="h-full rounded-full transition-all duration-700 flex items-center justify-end pr-2
-                            {{ $count == $maxHourly ? 'bg-amber-500' : 'bg-slate-200' }}"
+                            {{ $count == $maxHourly && $count > 0 ? 'bg-amber-500' : 'bg-slate-200' }}"
                             style="width: {{ $maxHourly > 0 ? round(($count / $maxHourly) * 100) : 0 }}%">
                             @if($count > 0)
                             <span class="text-[8px] font-black {{ $count == $maxHourly ? 'text-black' : 'text-slate-500' }}">{{ $count }}</span>
@@ -390,12 +390,13 @@
                         <th class="p-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Aksi</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="booking-table-body">
                     @forelse($bookings as $b)
                     <tr class="border-b border-slate-50 hover:bg-amber-50 transition-colors"
                         data-row
                         data-status="{{ $b->status }}"
                         data-date="{{ $b->booking_date }}"
+                        data-time="{{ $b->booking_time }}"
                         data-name="{{ strtolower($b->customer->name) }}">
                         <td class="p-4">
                             <div class="font-black text-slate-900 uppercase italic">{{ $b->customer->name }}</div>
@@ -455,8 +456,8 @@
 
 </div>
 
-{{-- Chart.js --}}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{{-- Chart.js — defer agar tidak block LCP --}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 
 <script>
     // ==================== DATA DARI LARAVEL ====================
@@ -542,7 +543,7 @@
                             title: (items) => items[0].label.toUpperCase(),
                             label: (item) => `  ${item.dataset.label}: ${item.raw} orang`,
                         }
-                    }
+                    },
                 },
                 scales: {
                     x: {
@@ -581,8 +582,16 @@
         buildChart(mode === 'week' ? chartDataWeek : chartDataMonth);
     }
 
+    // Chart hanya diinisialisasi setelah Chart.js selesai load (karena defer)
     document.addEventListener('DOMContentLoaded', () => {
-        buildChart(chartDataWeek);
+        if (typeof Chart !== 'undefined') {
+            buildChart(chartDataWeek);
+        } else {
+            // Fallback: tunggu script defer selesai
+            document.querySelector('script[src*="chart.js"]').addEventListener('load', () => {
+                buildChart(chartDataWeek);
+            });
+        }
     });
 
     // ==================== ALPINE DASHBOARD ====================
@@ -602,38 +611,179 @@
             loadingSlots: false,
             loadingRefresh: false,
 
+            // Stats reaktif — diupdate dari JSON refresh
+            stats: {
+                today: {{ $stats['today'] }},
+                active: {{ $stats['active'] }},
+                on_progress: {{ $stats['on_progress'] }},
+                completed: {{ $stats['completed'] }},
+            },
+
+            // AbortController untuk cegah request admin menumpuk
+            _abortController: null,
+
             init() {
                 this.$nextTick(() => this.applyFilter());
 
+                // Refresh setiap 15 detik via JSON endpoint (bukan full HTML)
                 setInterval(() => {
                     if (document.visibilityState === 'visible') {
-                        this.refreshTable();
+                        this.refreshData();
                     }
-                }, 2000);
+                }, 15000);
             },
 
-            async refreshTable() {
-                if (this.loadingRefresh) return;
-                this.loadingRefresh = true;
+            /**
+             * Refresh ringan: hanya fetch JSON stats + bookings.
+             * Sebelumnya fetch seluruh HTML halaman — sangat boros.
+             * Dengan AbortController, request lama dibatalkan jika belum selesai.
+             */
+            async refreshData() {
+                if (this._abortController) {
+                    this._abortController.abort();
+                }
+                this._abortController = new AbortController();
 
                 try {
-                    let response = await fetch(window.location.href);
-                    let text = await response.text();
-                    let parser = new DOMParser();
-                    let htmlDocument = parser.parseFromString(text, 'text/html');
+                    const res  = await fetch('/admin/live-data', {
+                        signal: this._abortController.signal,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const data = await res.json();
 
-                    let newTable = htmlDocument.getElementById('booking-table-content');
-                    if (newTable) document.getElementById('booking-table-content').innerHTML = newTable.innerHTML;
+                    // Update stats cards reaktif
+                    this.stats = data.stats;
 
-                    let newCards = htmlDocument.getElementById('booking-cards-content');
-                    if (newCards) document.getElementById('booking-cards-content').innerHTML = newCards.innerHTML;
+                    // Update tabel desktop
+                    this.updateTable(data.bookings);
+
+                    // Update cards mobile
+                    this.updateCards(data.bookings);
 
                     this.$nextTick(() => this.applyFilter());
-                } catch (e) {
-                    console.error('Refresh gagal:', e);
-                }
 
-                this.loadingRefresh = false;
+                } catch (e) {
+                    if (e.name !== 'AbortError') {
+                        console.error('Refresh gagal:', e);
+                    }
+                }
+            },
+
+            updateTable(bookings) {
+                const tbody = document.getElementById('booking-table-body');
+                if (!tbody) return;
+
+                tbody.innerHTML = bookings.length === 0
+                    ? `<tr><td colspan="4"><div class="text-center py-16"><p class="text-4xl mb-3">✂️</p><p class="font-black text-slate-300 uppercase italic">Belum ada booking</p></div></td></tr>`
+                    : bookings.map(b => this.buildTableRow(b)).join('');
+            },
+
+            updateCards(bookings) {
+                const container = document.getElementById('booking-cards-content');
+                if (!container) return;
+
+                container.innerHTML = bookings.length === 0
+                    ? `<div class="text-center py-16 bg-white rounded-3xl border-2 border-slate-100"><p class="text-4xl mb-3">✂️</p><p class="font-black text-slate-300 uppercase italic">Belum ada booking</p></div>`
+                    : bookings.map(b => this.buildCard(b)).join('');
+            },
+
+            buildTableRow(b) {
+                const statusClass = b.status === 'active'
+                    ? 'bg-green-100 text-green-700'
+                    : b.status === 'on-progress'
+                    ? 'bg-blue-600 text-white animate-pulse'
+                    : 'bg-slate-100 text-slate-600';
+
+                const completedTime = b.status === 'completed'
+                    ? `<div class="text-[10px] text-slate-400 mt-1 italic">${b.updated_at} WIB</div>` : '';
+
+                const actions = b.status === 'active'
+                    ? `<form action="/admin/start/${b.id}" method="POST" class="inline">
+                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                            <button class="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition mr-1">▶ Start</button>
+                       </form>
+                       <button onclick="window.__alpine.$data(document.querySelector('[x-data]')).openReschedule(${b.id}, '${b.customer_name.replace(/'/g, "\\'")}', '${b.booking_date}')"
+                           class="bg-amber-400 text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-amber-300 transition mr-1">
+                           ↺ Reschedule
+                       </button>
+                       <form action="/admin/cancel/${b.id}" method="POST" class="inline">
+                           <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                           <button class="bg-red-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-600 transition">✕ Cancel</button>
+                       </form>`
+                    : b.status === 'on-progress'
+                    ? `<form action="/admin/complete/${b.id}" method="POST" class="inline">
+                           <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                           <button class="bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-700 transition">✓ Finish</button>
+                       </form>`
+                    : `<span class="text-slate-300 text-[10px] font-bold uppercase">—</span>`;
+
+                return `<tr class="border-b border-slate-50 hover:bg-amber-50 transition-colors"
+                            data-row data-status="${b.status}" data-date="${b.booking_date}"
+                            data-time="${b.booking_time}" data-name="${b.customer_name.toLowerCase()}">
+                            <td class="p-4">
+                                <div class="font-black text-slate-900 uppercase italic">${b.customer_name}</div>
+                                <div class="text-xs text-slate-400 font-bold mt-0.5">${b.customer_phone}</div>
+                            </td>
+                            <td class="p-4">
+                                <div class="text-xs font-bold text-slate-500 uppercase">${b.booking_date}</div>
+                                <div class="text-amber-500 font-black text-lg italic tracking-tighter">${b.booking_time}</div>
+                            </td>
+                            <td class="p-4">
+                                <span class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase ${statusClass}">${b.status}</span>
+                                ${completedTime}
+                            </td>
+                            <td class="p-4 text-right whitespace-nowrap">${actions}</td>
+                        </tr>`;
+            },
+
+            buildCard(b) {
+                const statusClass = b.status === 'active'
+                    ? 'bg-green-100 text-green-700'
+                    : b.status === 'on-progress'
+                    ? 'bg-blue-600 text-white animate-pulse'
+                    : 'bg-slate-100 text-slate-600';
+
+                const actions = b.status === 'active'
+                    ? `<div class="grid grid-cols-2 gap-2 mb-2">
+                            <form action="/admin/start/${b.id}" method="POST">
+                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <button class="w-full bg-blue-600 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-blue-700 transition">▶ Mulai</button>
+                            </form>
+                            <form action="/admin/cancel/${b.id}" method="POST">
+                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <button class="w-full bg-red-500 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-red-600 transition">✕ Batal</button>
+                            </form>
+                       </div>`
+                    : b.status === 'on-progress'
+                    ? `<form action="/admin/complete/${b.id}" method="POST">
+                           <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                           <button class="w-full bg-green-600 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-green-700 transition">✓ Selesai</button>
+                       </form>`
+                    : '';
+
+                return `<div class="bg-white border-2 border-slate-100 rounded-3xl p-5 shadow-sm"
+                             data-row data-status="${b.status}" data-date="${b.booking_date}"
+                             data-time="${b.booking_time}" data-name="${b.customer_name.toLowerCase()}">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <div class="font-black text-slate-900 uppercase italic">${b.customer_name}</div>
+                                    <div class="text-xs text-slate-400 font-bold mt-0.5">${b.customer_phone}</div>
+                                </div>
+                                <span class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase ml-2 shrink-0 ${statusClass}">${b.status}</span>
+                            </div>
+                            <div class="flex items-center gap-4 bg-slate-50 rounded-2xl px-4 py-3 mb-4">
+                                <div>
+                                    <div class="text-[10px] font-black text-slate-400 uppercase italic mb-0.5">Tanggal</div>
+                                    <div class="text-sm font-black text-slate-700 uppercase">${b.booking_date}</div>
+                                </div>
+                                <div class="w-px h-8 bg-slate-200 shrink-0"></div>
+                                <div>
+                                    <div class="text-[10px] font-black text-slate-400 uppercase italic mb-0.5">Jam</div>
+                                    <div class="text-xl font-black text-amber-500 italic tracking-tighter">${b.booking_time}</div>
+                                </div>
+                            </div>
+                            ${actions}
+                        </div>`;
             },
 
             applyFilter() {
@@ -642,10 +792,9 @@
                 rows.forEach(row => {
                     const status = row.dataset.status;
                     const date   = row.dataset.date;
-                    const name   = row.dataset.name; // sudah lowercase dari blade
+                    const name   = row.dataset.name;
 
-                    const needle = this.filterSearch.toLowerCase().trim()
-                        .replace(/\s+/g, ' '); // normalize spasi ganda
+                    const needle = this.filterSearch.toLowerCase().trim().replace(/\s+/g, ' ');
 
                     const matchStatus = this.filterStatus === 'all' || status === this.filterStatus;
                     const matchDate   = this.filterDate === '' || date === this.filterDate;

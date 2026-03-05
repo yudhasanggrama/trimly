@@ -23,6 +23,8 @@
     now: '{{ now()->format('H:i') }}',
     today: '{{ now()->toDateString() }}',
 
+    _abortController: null,
+
     isBooked(slot) {
         return this.bookedSlots.includes(slot);
     },
@@ -54,13 +56,23 @@
     },
 
     async refreshSlots() {
+        // Batalkan request sebelumnya jika masih pending — ini yang mencegah request menumpuk
+        if (this._abortController) {
+            this._abortController.abort();
+        }
+        this._abortController = new AbortController();
+
         try {
-            const res  = await fetch('/?date=' + this.selectedDate + '&json=1');
+            const res = await fetch('/?date=' + this.selectedDate + '&json=1', {
+                signal: this._abortController.signal
+            });
             const data = await res.json();
             this.bookedSlots = data.bookedSlots;
             this.now         = data.now;
         } catch(e) {
-            console.error('Gagal refresh slots:', e);
+            if (e.name !== 'AbortError') {
+                console.error('Gagal refresh slots:', e);
+            }
         }
     },
 
@@ -72,7 +84,7 @@
     }
 }"
 x-init="
-    setInterval(() => refreshSlots(), 1000);
+    setInterval(() => refreshSlots(), 15000);
 "
 class="max-w-xl mx-auto pb-24 px-4">
 
