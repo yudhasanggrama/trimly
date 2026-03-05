@@ -460,6 +460,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 
 <script>
+    // ==================== CSRF TOKEN ====================
+    const _token = '{{ csrf_token() }}';
+
     // ==================== DATA DARI LARAVEL ====================
     const chartDataWeek = {
         labels: @json($chartData['week']['labels']),
@@ -699,7 +702,7 @@
 
                 const actions = b.status === 'active'
                     ? `<form action="/admin/start/${b.id}" method="POST" class="inline">
-                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="_token" value="${_token}">
                             <button class="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition mr-1">▶ Start</button>
                        </form>
                        <button onclick="window.__alpine.$data(document.querySelector('[x-data]')).openReschedule(${b.id}, '${b.customer_name.replace(/'/g, "\\'")}', '${b.booking_date}')"
@@ -707,12 +710,12 @@
                            ↺ Reschedule
                        </button>
                        <form action="/admin/cancel/${b.id}" method="POST" class="inline">
-                           <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                           <input type="hidden" name="_token" value="${_token}">
                            <button class="bg-red-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-600 transition">✕ Cancel</button>
                        </form>`
                     : b.status === 'on-progress'
                     ? `<form action="/admin/complete/${b.id}" method="POST" class="inline">
-                           <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                           <input type="hidden" name="_token" value="${_token}">
                            <button class="bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-green-700 transition">✓ Finish</button>
                        </form>`
                     : `<span class="text-slate-300 text-[10px] font-bold uppercase">—</span>`;
@@ -746,17 +749,17 @@
                 const actions = b.status === 'active'
                     ? `<div class="grid grid-cols-2 gap-2 mb-2">
                             <form action="/admin/start/${b.id}" method="POST">
-                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="_token" value="${_token}">
                                 <button class="w-full bg-blue-600 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-blue-700 transition">▶ Mulai</button>
                             </form>
                             <form action="/admin/cancel/${b.id}" method="POST">
-                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="_token" value="${_token}">
                                 <button class="w-full bg-red-500 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-red-600 transition">✕ Batal</button>
                             </form>
                        </div>`
                     : b.status === 'on-progress'
                     ? `<form action="/admin/complete/${b.id}" method="POST">
-                           <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                           <input type="hidden" name="_token" value="${_token}">
                            <button class="w-full bg-green-600 text-white py-3 rounded-2xl text-xs font-black uppercase hover:bg-green-700 transition">✓ Selesai</button>
                        </form>`
                     : '';
