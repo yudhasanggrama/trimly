@@ -1,30 +1,51 @@
+# ===============================
+# Laravel 10 - Railway Nixpacks
+# ===============================
+
+[variables]
+APP_ENV = "production"
+APP_DEBUG = "false"
+
+# -------------------------------
+# Setup Phase (Install PHP + Ext)
+# -------------------------------
 [phases.setup]
 nixPkgs = [
-    "php82",
-    "php82Extensions.pdo",
-    "php82Extensions.pdo_mysql",
-    "php82Extensions.mbstring",
-    "php82Extensions.tokenizer",
-    "php82Extensions.xml",
-    "php82Extensions.ctype",
-    "php82Extensions.fileinfo",
-    "php82Extensions.curl",
-    "php82Extensions.openssl",
-    "php82Extensions.bcmath",
-    "composer"
+  "php82",
+  "php82Extensions.pdo",
+  "php82Extensions.pdo_mysql",
+  "php82Extensions.mbstring",
+  "php82Extensions.tokenizer",
+  "php82Extensions.xml",
+  "php82Extensions.ctype",
+  "php82Extensions.fileinfo",
+  "php82Extensions.curl",
+  "php82Extensions.openssl",
+  "php82Extensions.bcmath",
+  "composer"
 ]
 
+# -------------------------------
+# Install Phase
+# -------------------------------
 [phases.install]
 cmds = [
-    "composer install --no-dev --optimize-autoloader"
+  "composer install --no-dev --optimize-autoloader --no-interaction"
 ]
 
+# -------------------------------
+# Build Phase
+# -------------------------------
 [phases.build]
 cmds = [
-    "php artisan config:cache",
-    "php artisan route:cache",
-    "php artisan view:cache"
+  "php artisan key:generate --force",
+  "php artisan config:cache",
+  "php artisan route:cache",
+  "php artisan view:cache"
 ]
 
+# -------------------------------
+# Start Phase
+# -------------------------------
 [start]
 cmd = "php -S 0.0.0.0:$PORT -t public"
