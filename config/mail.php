@@ -34,9 +34,6 @@ return [
     */
 
     'mailers' => [
-        'resend' => [
-        'transport' => 'resend',
-        ],
 
         'log' => [
             'transport' => 'log',
