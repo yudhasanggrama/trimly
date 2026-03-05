@@ -29,11 +29,8 @@ Route::middleware(['auth', AdminMiddleware::class])->prefix('admin')->name('admi
     Route::get('/available-slots',       [AdminController::class, 'availableSlots'])->name('available-slots');
 });
 
-Route::get('/test-mail', function () {
-    try {
-        Mail::raw('Test email', fn($m) => $m->to('raditbrian04@gmail.com')->subject('Test Trimly'));
-        return 'Mail sent!';
-    } catch (\Exception $e) {
-        return $e->getMessage();
-    }
+Route::get('/flush-queue', function () {
+    Artisan::call('queue:flush');
+    Artisan::call('queue:clear', ['connection' => 'database']);
+    return 'Queue flushed!';
 });
