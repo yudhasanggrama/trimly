@@ -12,11 +12,11 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         Customer::firstOrCreate([
+           'name' => 'Admin Trimly',
             'email' => 'admin@trimly.com',
-            'name'     => 'Admin TRIMLY',
-            'phone'    => '08123456789',
-            'password' => Hash::make('admin123'),
-            'role'     => 'admin',
+            'phone' => '081234567890',
+            'role' => 'admin',
+            'password' => Hash::make('admin123')
             ]
         );
     }
