@@ -358,12 +358,6 @@ MAIL_FROM_NAME=TRIMLY
 
 Dibuat via `UserSeeder`:
 
-| Field | Value |
-|---|---|
-| Email | `admin@trimly.com` |
-| Password | `admin123` |
-| Role | `admin` |
-
 > Ganti password setelah pertama login!
 
 ---
