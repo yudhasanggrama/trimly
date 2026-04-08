@@ -11,12 +11,13 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        User::firstOrCreate([
-           'name' => 'Admin Trimly',
-            'email' => 'admin@trimly.com',
-            'phone' => '081234567890',
-            'role' => 'admin',
-            'password' => Hash::make('admin123')
+        User::firstOrCreate(
+            ['email' => 'admin@trimly.com'], // cari berdasarkan email
+            [
+                'name' => 'Admin Trimly',
+                'phone' => '081234567890',
+                'role' => 'admin',
+                'password' => Hash::make('admin123')
             ]
         );
     }
