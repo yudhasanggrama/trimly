@@ -55,6 +55,7 @@ class AdminController extends Controller
         $bookings = Booking::with('customer')
             ->where('booking_date', '>=', now()->subDays(3)->toDateString())
             ->orderBy('booking_date', 'desc')
+            ->limit(100)
             ->get()
             ->map(fn($b) => [
                 'id'           => $b->id,
@@ -165,6 +166,13 @@ class AdminController extends Controller
         $excludeId = $request->exclude_id;
         $capacity  = (int) Setting::get('capacity', 1);
 
+        $bookedCounts = Booking::where('booking_date', $date)
+            ->whereIn('status', ['active', 'on-progress'])
+            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
+            ->select('booking_time', DB::raw('count(*) as total'))
+            ->groupBy('booking_time')
+            ->pluck('total', 'booking_time');
+
         $availableSlots = [];
 
         foreach ($this->timeSlots as $slot) {
@@ -174,13 +182,7 @@ class AdminController extends Controller
                 continue;
             }
 
-            $bookedCount = Booking::where('booking_date', $date)
-                ->where('booking_time', $slot . ':00')
-                ->whereIn('status', ['active', 'on-progress'])
-                ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
-                ->count();
-
-            if ($bookedCount < $capacity) {
+            if ($bookedCounts->get($slot . ':00', 0) < $capacity) {
                 $availableSlots[] = $slot;
             }
         }
