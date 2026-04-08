@@ -321,131 +321,131 @@ class BookingTest extends TestCase
         $response->assertRedirect(route('home'));
     }
 
-//     /** @test */
-//     public function ditolak_jika_email_sama_masih_punya_booking_aktif_di_slot_yang_sama(): void
-//     {
-//         Mail::fake();
+    /** @test */
+    public function ditolak_jika_email_sama_masih_punya_booking_aktif_di_slot_yang_sama(): void
+    {
+        Mail::fake();
 
-//         $date     = now()->addDay()->toDateString();
-//         $customer = Customer::factory()->create([
-//             'email' => 'budi@example.com',
-//             'phone' => '08123456789',
-//         ]);
+        $date     = now()->addDay()->toDateString();
+        $customer = Customer::factory()->create([
+            'email' => 'budi@example.com',
+            'phone' => '08123456789',
+        ]);
 
-//         Booking::factory()->create([
-//             'customer_id'  => $customer->id,
-//             'booking_date' => $date,
-//             'booking_time' => '09:00:00',
-//             'status'       => 'active',
-//         ]);
+        Booking::factory()->create([
+            'customer_id'  => $customer->id,
+            'booking_date' => $date,
+            'booking_time' => '09:00:00',
+            'status'       => 'active',
+        ]);
 
-//         $response = $this->post(route('booking.store'), [
-//             'name'         => 'Budi',
-//             'email'        => 'budi@example.com',
-//             'phone'        => '08123456789',
-//             'booking_date' => $date,
-//             'booking_time' => '09:00',
-//         ]);
+        $response = $this->post(route('booking.store'), [
+            'name'         => 'Budi',
+            'email'        => 'budi@example.com',
+            'phone'        => '08123456789',
+            'booking_date' => $date,
+            'booking_time' => '09:00',
+        ]);
 
-//         $response->assertSessionHasErrors('msg');
-//         $this->assertDatabaseCount('bookings', 1);
-//         Mail::assertNothingQueued();
-//     }
+        $response->assertSessionHasErrors('msg');
+        $this->assertDatabaseCount('bookings', 1);
+        Mail::assertNothingQueued();
+    }
 
-//     /** @test */
-//     public function ditolak_jika_phone_sama_masih_punya_booking_aktif(): void
-//     {
-//         Mail::fake();
+    /** @test */
+    public function ditolak_jika_phone_sama_masih_punya_booking_aktif(): void
+    {
+        Mail::fake();
 
-//         $date     = now()->addDay()->toDateString();
-//         $customer = Customer::factory()->create(['phone' => '08123456789']);
+        $date     = now()->addDay()->toDateString();
+        $customer = Customer::factory()->create(['phone' => '08123456789']);
 
-//         Booking::factory()->create([
-//             'customer_id'  => $customer->id,
-//             'booking_date' => $date,
-//             'booking_time' => '09:00:00',
-//             'status'       => 'active',
-//         ]);
+        Booking::factory()->create([
+            'customer_id'  => $customer->id,
+            'booking_date' => $date,
+            'booking_time' => '09:00:00',
+            'status'       => 'active',
+        ]);
 
-//         $response = $this->post(route('booking.store'), [
-//             'name'         => 'Budi Lain',
-//             'email'        => 'budilain@example.com',
-//             'phone'        => '08123456789', // phone sama
-//             'booking_date' => $date,
-//             'booking_time' => '09:00',
-//         ]);
+        $response = $this->post(route('booking.store'), [
+            'name'         => 'Budi Lain',
+            'email'        => 'budilain@example.com',
+            'phone'        => '08123456789', // phone sama
+            'booking_date' => $date,
+            'booking_time' => '09:00',
+        ]);
 
-//         $response->assertSessionHasErrors('msg');
-//     }
+        $response->assertSessionHasErrors('msg');
+    }
 
-//     /** @test */
-//     public function bisa_booking_lagi_jika_booking_sebelumnya_sudah_completed(): void
-//     {
-//         Mail::fake();
+    /** @test */
+    public function bisa_booking_lagi_jika_booking_sebelumnya_sudah_completed(): void
+    {
+        Mail::fake();
 
-//         $date     = now()->addDay()->toDateString();
-//         $customer = Customer::factory()->create([
-//             'email' => 'budi@example.com',
-//             'phone' => '08123456789',
-//         ]);
+        $date     = now()->addDay()->toDateString();
+        $customer = Customer::factory()->create([
+            'email' => 'budi@example.com',
+            'phone' => '08123456789',
+        ]);
 
-//         Booking::factory()->create([
-//             'customer_id'  => $customer->id,
-//             'booking_date' => $date,
-//             'booking_time' => '09:00:00',
-//             'status'       => 'completed', // sudah selesai
-//         ]);
+        Booking::factory()->create([
+            'customer_id'  => $customer->id,
+            'booking_date' => $date,
+            'booking_time' => '09:00:00',
+            'status'       => 'completed', // sudah selesai
+        ]);
 
-//         $response = $this->post(route('booking.store'), [
-//             'name'         => 'Budi',
-//             'email'        => 'budi@example.com',
-//             'phone'        => '08123456789',
-//             'booking_date' => $date,
-//             'booking_time' => '09:00',
-//         ]);
+        $response = $this->post(route('booking.store'), [
+            'name'         => 'Budi',
+            'email'        => 'budi@example.com',
+            'phone'        => '08123456789',
+            'booking_date' => $date,
+            'booking_time' => '09:00',
+        ]);
 
-//         $response->assertRedirect(route('home'));
-//     }
+        $response->assertRedirect(route('home'));
+    }
 
-//     /** @test */
-//     public function email_konfirmasi_dikirim_ke_customer_setelah_booking(): void
-//     {
-//         Mail::fake();
+    /** @test */
+    public function email_konfirmasi_dikirim_ke_customer_setelah_booking(): void
+    {
+        Mail::fake();
 
-//         $this->post(route('booking.store'), [
-//             'name'         => 'Budi',
-//             'phone'        => '08123456789',
-//             'email'        => 'budi@example.com',
-//             'booking_date' => now()->addDay()->toDateString(),
-//             'booking_time' => '09:00',
-//         ]);
+        $this->post(route('booking.store'), [
+            'name'         => 'Budi',
+            'phone'        => '08123456789',
+            'email'        => 'budi@example.com',
+            'booking_date' => now()->addDay()->toDateString(),
+            'booking_time' => '09:00',
+        ]);
 
-//         Mail::assertQueued(BookingSuccessMail::class, function ($mail) {
-//             return true;
-//         });
-//     }
+        Mail::assertQueued(BookingSuccessMail::class, function ($mail) {
+            return true;
+        });
+    }
 
-//     /** @test */
-//     public function email_tidak_dikirim_jika_booking_gagal(): void
-//     {
-//         Mail::fake();
+    /** @test */
+    public function email_tidak_dikirim_jika_booking_gagal(): void
+    {
+        Mail::fake();
 
-//         $date = now()->addDay()->toDateString();
+        $date = now()->addDay()->toDateString();
 
-//         Booking::factory()->count(2)->create([
-//             'booking_date' => $date,
-//             'booking_time' => '09:00:00',
-//             'status'       => 'active',
-//         ]);
+        Booking::factory()->count(2)->create([
+            'booking_date' => $date,
+            'booking_time' => '09:00:00',
+            'status'       => 'active',
+        ]);
 
-//         $this->post(route('booking.store'), [
-//             'name'         => 'Budi',
-//             'phone'        => '08123456789',
-//             'email'        => 'budi@example.com',
-//             'booking_date' => $date,
-//             'booking_time' => '09:00',
-//         ]);
+        $this->post(route('booking.store'), [
+            'name'         => 'Budi',
+            'phone'        => '08123456789',
+            'email'        => 'budi@example.com',
+            'booking_date' => $date,
+            'booking_time' => '09:00',
+        ]);
 
-//         Mail::assertNothingQueued();
-//     }
+        Mail::assertNothingQueued();
+    }
 }
