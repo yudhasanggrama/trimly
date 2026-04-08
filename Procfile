@@ -1,1 +1,1 @@
-web: php artisan storage:link --force && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT & php artisan queue:work --sleep=3 --tries=3 --max-time=90
+web: php artisan storage:link --force && php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=$PORT
