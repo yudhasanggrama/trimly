@@ -87,6 +87,10 @@ return [
             ],
         ],
 
+        'resend' => [
+            'transport' => 'resend',
+        ],
+
         'roundrobin' => [
             'transport' => 'roundrobin',
             'mailers' => [
